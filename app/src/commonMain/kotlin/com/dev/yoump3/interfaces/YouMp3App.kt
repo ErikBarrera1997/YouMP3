@@ -2,7 +2,6 @@ package com.dev.yoump3.interfaces
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.background
@@ -10,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -18,14 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +36,27 @@ private val PanelBackground = Color(0xFF181818)
 private val BorderColor = Color(0xFF2B2B2B)
 private val PrimaryText = Color(0xFFFFFFFF)
 private val SecondaryText = Color(0xFFAEBBD2)
+private val MaterialMusicNote = ImageVector.Builder(
+    name = "MaterialMusicNote",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).apply {
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(12f, 3f)
+        verticalLineToRelative(10.55f)
+        curveToRelative(-0.59f, -0.34f, -1.27f, -0.55f, -2f, -0.55f)
+        curveToRelative(-2.21f, 0f, -4f, 1.79f, -4f, 4f)
+        reflectiveCurveToRelative(1.79f, 4f, 4f, 4f)
+        reflectiveCurveToRelative(4f, -1.79f, 4f, -4f)
+        verticalLineTo(7f)
+        horizontalLineToRelative(4f)
+        verticalLineTo(3f)
+        horizontalLineToRelative(-6f)
+        close()
+    }
+}.build()
 
 @Composable
 fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }) {
@@ -190,35 +208,11 @@ private fun MusicNoteCircleButton(onClick: () -> Unit) {
             )
             .padding(42.dp)
     ) {
-        MusicNoteIcon(Modifier.fillMaxSize())
-    }
-}
-
-@Composable
-private fun MusicNoteIcon(modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.aspectRatio(1f)) {
-        val stroke = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        val notePath = Path().apply {
-            moveTo(size.width * 0.39f, size.height * 0.20f)
-            quadraticTo(size.width * 0.55f, size.height * 0.26f, size.width * 0.70f, size.height * 0.20f)
-            quadraticTo(size.width * 0.76f, size.height * 0.34f, size.width * 0.84f, size.height * 0.45f)
-            lineTo(size.width * 0.84f, size.height * 0.70f)
-            moveTo(size.width * 0.39f, size.height * 0.20f)
-            quadraticTo(size.width * 0.45f, size.height * 0.45f, size.width * 0.36f, size.height * 0.66f)
-            lineTo(size.width * 0.36f, size.height * 0.78f)
-        }
-        drawPath(notePath, PrimaryText, style = stroke)
-        drawOval(
-            color = PrimaryText,
-            topLeft = Offset(size.width * 0.22f, size.height * 0.70f),
-            size = Size(size.width * 0.18f, size.height * 0.13f),
-            style = stroke
-        )
-        drawOval(
-            color = PrimaryText,
-            topLeft = Offset(size.width * 0.70f, size.height * 0.68f),
-            size = Size(size.width * 0.18f, size.height * 0.13f),
-            style = stroke
+        Icon(
+            imageVector = MaterialMusicNote,
+            contentDescription = "Music note",
+            tint = PrimaryText,
+            modifier = Modifier.fillMaxSize()
         )
     }
 }

@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: [main]
+    branches: [master, alpha]
   pull_request:
-    branches: [main]
+    branches: [master, alpha]
   workflow_dispatch:
 
 jobs:
@@ -29,11 +29,20 @@ jobs:
       - name: Build Android APK
         run: ./gradlew assembleDebug
 
+      - name: Android Lint
+        run: ./gradlew lintDebug
+
       - name: Build Desktop App
         run: ./gradlew :app:compileKotlinDesktop
 
       - name: Run all tests
         run: ./gradlew check
+
+      - name: Upload Lint report
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
