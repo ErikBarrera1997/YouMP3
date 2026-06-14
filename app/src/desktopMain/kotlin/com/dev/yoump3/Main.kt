@@ -9,6 +9,6 @@ fun main() = application {
         onCloseRequest = ::exitApplication,
         title = "YouMp3"
     ) {
-        YouMp3App()
+        YouMp3App(onExit = ::exitApplication)
     }
 }

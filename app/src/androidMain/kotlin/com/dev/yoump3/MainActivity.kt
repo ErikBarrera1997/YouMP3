@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
             }
         )
         setContent {
-            YouMp3App(viewModel = viewModel)
+            YouMp3App(viewModel = viewModel, onExit = { finishAffinity() })
         }
     }
 }

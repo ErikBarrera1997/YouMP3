@@ -14,7 +14,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.init.ErrorScreen
+import com.dev.yoump3.init.InitScreen
 import com.dev.yoump3.viewModels.SongInputViewModel
 import com.dev.yoump3.viewModels.YouMp3Screen
 import com.dev.yoump3.viewModels.YouMp3ViewModel
@@ -61,15 +66,24 @@ private val MaterialMusicNote = ImageVector.Builder(
 }.build()
 
 @Composable
-fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }) {
+fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExit: () -> Unit = {}) {
     val songInputViewModel = remember { SongInputViewModel() }
+    var appReady by remember { mutableStateOf(false) }
+    var connectionFailed by remember { mutableStateOf(false) }
 
     YouMp3Theme {
-        YouMp3Screen(
-            viewModel = viewModel,
-            songInputViewModel = songInputViewModel,
-            modifier = Modifier.fillMaxSize()
-        )
+        when {
+            !appReady && !connectionFailed -> InitScreen(
+                onConnected = { appReady = true },
+                onError = { connectionFailed = true }
+            )
+            connectionFailed -> ErrorScreen(onExit = onExit)
+            else -> YouMp3Screen(
+                viewModel = viewModel,
+                songInputViewModel = songInputViewModel,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 

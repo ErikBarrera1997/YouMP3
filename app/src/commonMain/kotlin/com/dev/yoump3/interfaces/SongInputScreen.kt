@@ -13,12 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -70,7 +72,44 @@ fun SongInputScreenContent(
                     onValueChange = viewModel::onSongQueryChange,
                     modifier = Modifier.weight(1f)
                 )
-                SearchActionButton(onClick = viewModel::onSearchClick)
+                SearchActionButton(
+                    onClick = viewModel::onSearchClick,
+                    enabled = !state.isLoading
+                )
+            }
+
+            if (state.isLoading) {
+                CircularProgressIndicator(
+                    color = PrimaryText,
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .size(24.dp)
+                        //.align(Alignment.CenterHorizontally)
+                )
+            }
+
+            state.resultMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = PrimaryText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
+            state.errorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = Color(0xFFFF5252),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
             }
         }
 
@@ -146,19 +185,22 @@ private fun SongInputBox(
 @Composable
 private fun SearchActionButton(
     onClick: () -> Unit,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val borderColor = if (enabled) PrimaryText else SecondaryText
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(70.dp)
             .background(AppBackground)
-            .border(4.dp, PrimaryText)
-            .clickable(onClick = onClick)
+            .border(4.dp, borderColor)
+            .clickable(enabled = enabled, onClick = onClick)
     ) {
         Text(
             text = "GO",
-            color = PrimaryText,
+            color = borderColor,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.titleLarge
         )
