@@ -29,13 +29,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.viewModels.SongInputViewModel
+import com.dev.yoump3.viewModels.YouMp3Screen
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 
-private val AppBackground = Color(0xFF111111)
-private val PanelBackground = Color(0xFF181818)
-private val BorderColor = Color(0xFF2B2B2B)
-private val PrimaryText = Color(0xFFFFFFFF)
-private val SecondaryText = Color(0xFFAEBBD2)
+internal val AppBackground = Color(0xFF111111)
+internal val PanelBackground = Color(0xFF181818)
+internal val BorderColor = Color(0xFF2B2B2B)
+internal val PrimaryText = Color(0xFFFFFFFF)
+internal val SecondaryText = Color(0xFFAEBBD2)
 private val MaterialMusicNote = ImageVector.Builder(
     name = "MaterialMusicNote",
     defaultWidth = 24.dp,
@@ -60,9 +62,12 @@ private val MaterialMusicNote = ImageVector.Builder(
 
 @Composable
 fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }) {
+    val songInputViewModel = remember { SongInputViewModel() }
+
     YouMp3Theme {
         YouMp3Screen(
             viewModel = viewModel,
+            songInputViewModel = songInputViewModel,
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -108,6 +113,7 @@ private fun YouMp3Theme(content: @Composable () -> Unit) {
 @Composable
 fun YouMp3Screen(
     viewModel: YouMp3ViewModel,
+    songInputViewModel: SongInputViewModel,
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.state
@@ -117,15 +123,25 @@ fun YouMp3Screen(
         contentColor = PrimaryText,
         modifier = modifier
     ) {
-        FindItScreenContent(
-            appTitle = state.appTitle,
-            title = state.title,
-            footer = state.footer,
-            onFindClick = viewModel::onFindButtonClick,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(AppBackground)
-        )
+        when (state.currentScreen) {
+            YouMp3Screen.Home -> FindItScreenContent(
+                appTitle = state.appTitle,
+                title = state.title,
+                footer = state.footer,
+                onFindClick = viewModel::onFindButtonClick,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(AppBackground)
+            )
+
+            YouMp3Screen.SongInput -> SongInputScreenContent(
+                viewModel = songInputViewModel,
+                onCloseClick = viewModel::onCloseSongInputClick,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(AppBackground)
+            )
+        }
     }
 }
 

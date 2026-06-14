@@ -4,10 +4,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
+enum class YouMp3Screen {
+    Home,
+    SongInput
+}
+
 data class YouMp3UiState(
     val appTitle: String = "YOUMP3",
     val title: String = "FIND IT!",
     val footer: String = "BY MSSERVICES",
+    val currentScreen: YouMp3Screen = YouMp3Screen.Home,
     val findButtonPresses: Int = 0
 )
 
@@ -16,6 +22,13 @@ class YouMp3ViewModel {
         private set
 
     fun onFindButtonClick() {
-        state = state.copy(findButtonPresses = state.findButtonPresses + 1)
+        state = state.copy(
+            currentScreen = YouMp3Screen.SongInput,
+            findButtonPresses = state.findButtonPresses + 1
+        )
+    }
+
+    fun onCloseSongInputClick() {
+        state = state.copy(currentScreen = YouMp3Screen.Home)
     }
 }
