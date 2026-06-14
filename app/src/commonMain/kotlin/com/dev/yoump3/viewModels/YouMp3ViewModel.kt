@@ -31,4 +31,13 @@ class YouMp3ViewModel {
     fun onCloseSongInputClick() {
         state = state.copy(currentScreen = YouMp3Screen.Home)
     }
+
+    fun onBackClick(): Boolean {
+        return if (state.currentScreen == YouMp3Screen.SongInput) {
+            onCloseSongInputClick()
+            true
+        } else {
+            false
+        }
+    }
 }

@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dev.yoump3.viewModels.SongInputViewModel
@@ -63,10 +65,12 @@ fun SongInputScreenContent(
                     .padding(top = 54.dp, bottom = 18.dp)
             ) {
                 SongInputBox(
+                    value = state.songQuery,
                     placeholder = state.placeholder,
+                    onValueChange = viewModel::onSongQueryChange,
                     modifier = Modifier.weight(1f)
                 )
-                SearchActionBox()
+                SearchActionButton(onClick = viewModel::onSearchClick)
             }
         }
 
@@ -104,32 +108,59 @@ private fun CloseButton(
 
 @Composable
 private fun SongInputBox(
+    value: String,
     placeholder: String,
+    onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        contentAlignment = Alignment.CenterStart,
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.titleLarge.merge(
+            TextStyle(color = PrimaryText)
+        ),
         modifier = modifier
             .height(70.dp)
             .clip(CircleShape)
             .background(AppBackground)
             .border(4.dp, PrimaryText, CircleShape)
-            .padding(horizontal = 26.dp)
-    ) {
-        Text(
-            text = placeholder,
-            color = PrimaryText,
-            style = MaterialTheme.typography.titleLarge
-        )
-    }
+            .padding(horizontal = 26.dp),
+        decorationBox = { innerTextField ->
+            Box(
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        color = SecondaryText,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+                innerTextField()
+            }
+        }
+    )
 }
 
 @Composable
-private fun SearchActionBox(modifier: Modifier = Modifier) {
+private fun SearchActionButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Box(
+        contentAlignment = Alignment.Center,
         modifier = modifier
             .size(70.dp)
             .background(AppBackground)
             .border(4.dp, PrimaryText)
-    )
+            .clickable(onClick = onClick)
+    ) {
+        Text(
+            text = "GO",
+            color = PrimaryText,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleLarge
+        )
+    }
 }
