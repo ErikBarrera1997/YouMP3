@@ -14,13 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dev.yoump3.interfaces.AppBackground
 import com.dev.yoump3.interfaces.PrimaryText
 import com.dev.yoump3.interfaces.SecondaryText
-import kotlinx.coroutines.delay
 
 @Composable
 fun InitScreen(onConnected: () -> Unit, onError: () -> Unit) {
@@ -65,43 +63,4 @@ fun InitScreen(onConnected: () -> Unit, onError: () -> Unit) {
     }
 }
 
-@Composable
-fun ErrorScreen(onExit: () -> Unit) {
-    Column(
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-    ) {
-        Text(
-            text = "YOUMP3",
-            color = PrimaryText,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.displayLarge
-        )
 
-        Spacer(Modifier.height(48.dp))
-
-        Text(
-            text = "NO SE PUDO CONECTAR",
-            color = Color(0xFFFF5252),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Text(
-            text = "AL SERVIDOR",
-            color = Color(0xFFFF5252),
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.titleLarge
-        )
-
-        LaunchedEffect(Unit) {
-            delay(2000)
-            onExit()
-        }
-    }
-}

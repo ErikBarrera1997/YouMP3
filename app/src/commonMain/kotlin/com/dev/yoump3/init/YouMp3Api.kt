@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class AudioExtractionRequest(val videoName: String)
+data class AudioExtractionRequest(val videoName: String, val videoId: String? = null)
 
 @Serializable
 data class AudioExtractionResponse(
@@ -24,15 +24,33 @@ data class AudioExtractionResponse(
     val audioBase64: String? = null
 )
 
+@Serializable
+data class AudioSearchRequest(val videoName: String)
+
+@Serializable
+data class AudioSearchResult(
+    val videoId: String? = null,
+    val title: String? = null,
+    val author: String? = null,
+    val durationSeconds: Long? = null
+)
+
+@Serializable
+data class AudioSearchResponse(
+    val success: Boolean,
+    val message: String,
+    val results: List<AudioSearchResult> = emptyList()
+)
+
 object YouMp3Api {
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 20000
+            requestTimeoutMillis = 200000
             connectTimeoutMillis = 20000
-            socketTimeoutMillis = 20000
+            socketTimeoutMillis = 200000
         }
     }
 
@@ -40,10 +58,17 @@ object YouMp3Api {
         client.get(YouMp3ApiConfig.baseUrl)
     }
 
-    suspend fun extractAudio(videoName: String): AudioExtractionResponse {
+    suspend fun searchSongs(videoName: String): AudioSearchResponse {
+        return client.post("${YouMp3ApiConfig.baseUrl}/api/audios/search") {
+            contentType(ContentType.Application.Json)
+            setBody(AudioSearchRequest(videoName))
+        }.body()
+    }
+
+    suspend fun extractAudio(videoName: String, videoId: String? = null): AudioExtractionResponse {
         return client.post("${YouMp3ApiConfig.baseUrl}/api/audios/extract") {
             contentType(ContentType.Application.Json)
-            setBody(AudioExtractionRequest(videoName))
+            setBody(AudioExtractionRequest(videoName, videoId))
         }.body()
     }
 }

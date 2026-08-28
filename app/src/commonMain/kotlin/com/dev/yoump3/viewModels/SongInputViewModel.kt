@@ -4,20 +4,35 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.dev.yoump3.init.YouMp3Api
+import com.dev.yoump3.services.saveAudioToDownloads
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+data class SearchResultUi(
+    val videoId: String,
+    val title: String,
+    val author: String,
+    val durationSeconds: Long?
+)
+
 data class SongInputUiState(
     val appTitle: String = "YOUMP3",
-    val placeholder: String = "TYPE THE SONG",
+    val placeholder: String = "Search for song, artist....",
     val footer: String = "BY MSSERVICES",
     val songQuery: String = "",
     val lastSearchQuery: String = "",
     val searchRequests: Int = 0,
     val isLoading: Boolean = false,
-    val resultMessage: String? = null,
+    val searchResults: List<SearchResultUi> = emptyList(),
+    val isExtracting: Boolean = false,
+    val selectedTitle: String? = null,
+    val resultTitle: String? = null,
+    val resultFormat: String? = null,
+    val resultAudioBase64: String? = null,
+    val isDownloading: Boolean = false,
+    val downloadStatus: String? = null,
     val errorMessage: String? = null
 )
 
@@ -28,7 +43,15 @@ class SongInputViewModel {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun onSongQueryChange(value: String) {
-        state = state.copy(songQuery = value, resultMessage = null, errorMessage = null)
+        state = state.copy(
+            songQuery = value,
+            searchResults = emptyList(),
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
+            errorMessage = null
+        )
     }
 
     fun onSearchClick() {
@@ -39,21 +62,39 @@ class SongInputViewModel {
             lastSearchQuery = query,
             searchRequests = state.searchRequests + 1,
             isLoading = true,
-            resultMessage = null,
+            searchResults = emptyList(),
+            selectedTitle = null,
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
             errorMessage = null
         )
 
         scope.launch {
             try {
-                val response = YouMp3Api.extractAudio(query)
-                state = state.copy(
-                    isLoading = false,
-                    resultMessage = if (response.success) {
-                        "✓ ${response.videoTitle ?: response.message}"
-                    } else {
-                        "✗ ${response.message}"
-                    }
-                )
+                val response = YouMp3Api.searchSongs(query)
+                if (response.success) {
+                    state = state.copy(
+                        isLoading = false,
+                        searchResults = response.results.mapNotNull { result ->
+                            val videoId = result.videoId
+                            val title = result.title
+                            if (videoId.isNullOrBlank() || title.isNullOrBlank()) null
+                            else SearchResultUi(
+                                videoId = videoId,
+                                title = title,
+                                author = result.author ?: "Desconocido",
+                                durationSeconds = result.durationSeconds
+                            )
+                        }
+                    )
+                } else {
+                    state = state.copy(
+                        isLoading = false,
+                        errorMessage = response.message
+                    )
+                }
             } catch (e: Exception) {
                 state = state.copy(
                     isLoading = false,
@@ -61,5 +102,90 @@ class SongInputViewModel {
                 )
             }
         }
+    }
+
+    fun onSelectResult(videoId: String, title: String) {
+        state = state.copy(
+            isExtracting = true,
+            selectedTitle = title,
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
+            errorMessage = null
+        )
+
+        scope.launch {
+            try {
+                val response = YouMp3Api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
+                if (response.success) {
+                    state = state.copy(
+                        isExtracting = false,
+                        resultTitle = response.videoTitle ?: title,
+                        resultFormat = resolveFormat(response.contentType, response.fileName),
+                        resultAudioBase64 = response.audioBase64
+                    )
+                } else {
+                    state = state.copy(
+                        isExtracting = false,
+                        errorMessage = response.message
+                    )
+                }
+            } catch (e: Exception) {
+                state = state.copy(
+                    isExtracting = false,
+                    errorMessage = "Error: ${e.message ?: "Could not connect to server"}"
+                )
+            }
+        }
+    }
+
+    fun onDownloadClick() {
+        val base64 = state.resultAudioBase64 ?: return
+
+        state = state.copy(
+            isDownloading = true,
+            downloadStatus = null,
+            errorMessage = null
+        )
+
+        scope.launch {
+            try {
+                val fileName = "${sanitizeFileName(state.resultTitle ?: "audio")}.mp3"
+                val path = saveAudioToDownloads(fileName, "audio/mpeg", base64)
+                state = state.copy(
+                    isDownloading = false,
+                    downloadStatus = "Descargado en: $path"
+                )
+            } catch (e: Exception) {
+                state = state.copy(
+                    isDownloading = false,
+                    errorMessage = "Error al descargar: ${e.message ?: "no se pudo guardar el archivo"}"
+                )
+            }
+        }
+    }
+
+    private fun resolveFormat(contentType: String?, fileName: String?): String {
+        val extension = fileName?.substringAfterLast('.', "")?.trim()?.uppercase()
+        if (!extension.isNullOrBlank() && extension.length in 2..5) return extension
+
+        return when {
+            contentType == null -> "MP3"
+            contentType.contains("mpeg") -> "MP3"
+            contentType.contains("mp4") -> "M4A"
+            contentType.contains("webm") -> "WEBM"
+            contentType.contains("ogg") -> "OGG"
+            contentType.contains("wav") -> "WAV"
+            else -> contentType.substringAfter('/').uppercase()
+        }
+    }
+
+    private fun sanitizeFileName(name: String): String {
+        val cleaned = name.trim()
+            .replace(Regex("""[\\/:*?"<>|]"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        return cleaned.ifEmpty { "audio" }.take(80)
     }
 }

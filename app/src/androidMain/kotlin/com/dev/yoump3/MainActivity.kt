@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.dev.yoump3.interfaces.YouMp3App
+import com.dev.yoump3.services.AppContextProvider
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 
 class MainActivity : ComponentActivity() {
@@ -13,6 +14,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppContextProvider.context = applicationContext
         enableEdgeToEdge()
         onBackPressedDispatcher.addCallback(
             this,

@@ -32,8 +32,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.dev.yoump3.init.ErrorScreen
 import com.dev.yoump3.init.InitScreen
+import com.dev.yoump3.viewModels.ErrorStatusViewModel
 import com.dev.yoump3.viewModels.SongInputViewModel
 import com.dev.yoump3.viewModels.YouMp3Screen
 import com.dev.yoump3.viewModels.YouMp3ViewModel
@@ -68,6 +68,7 @@ private val MaterialMusicNote = ImageVector.Builder(
 @Composable
 fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExit: () -> Unit = {}) {
     val songInputViewModel = remember { SongInputViewModel() }
+    val errorStatusViewModel = remember { ErrorStatusViewModel() }
     var appReady by remember { mutableStateOf(false) }
     var connectionFailed by remember { mutableStateOf(false) }
 
@@ -77,7 +78,10 @@ fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExi
                 onConnected = { appReady = true },
                 onError = { connectionFailed = true }
             )
-            connectionFailed -> ErrorScreen(onExit = onExit)
+            connectionFailed -> ErrorStatusScreen(
+                viewModel = errorStatusViewModel,
+                onGoBackToHome = { connectionFailed = false }
+            )
             else -> YouMp3Screen(
                 viewModel = viewModel,
                 songInputViewModel = songInputViewModel,
