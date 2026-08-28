@@ -178,6 +178,7 @@ fun SongInputScreenContent(
         }
     }
 }
+}
 
 @Composable
 private fun ResponseText(

@@ -3,6 +3,7 @@ package com.dev.yoump3.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
 import com.dev.yoump3.services.saveAudioToDownloads
 import kotlinx.coroutines.CoroutineScope
@@ -98,10 +99,15 @@ class SongInputViewModel {
                         errorMessage = response.message
                     )
                 }
+            } catch (e: ApiException) {
+                state = state.copy(
+                    isLoading = false,
+                    errorMessage = e.apiMessage
+                )
             } catch (e: Exception) {
                 state = state.copy(
                     isLoading = false,
-                    errorMessage = "Error: ${e.message ?: "Could not connect to server"}"
+                    errorMessage = "Service unavailable. Try again later."
                 )
             }
         }
@@ -135,10 +141,15 @@ class SongInputViewModel {
                         errorMessage = response.message
                     )
                 }
+            } catch (e: ApiException) {
+                state = state.copy(
+                    isExtracting = false,
+                    errorMessage = e.apiMessage
+                )
             } catch (e: Exception) {
                 state = state.copy(
                     isExtracting = false,
-                    errorMessage = "Error: ${e.message ?: "Could not connect to server"}"
+                    errorMessage = "Service unavailable. Try again later."
                 )
             }
         }
@@ -166,7 +177,7 @@ class SongInputViewModel {
                 state = state.copy(
                     isDownloading = false,
                     isDownloadFailed = true,
-                    errorMessage = e.message ?: "no se pudo guardar el archivo"
+                    errorMessage = "No se pudo guardar el archivo."
                 )
             }
         }

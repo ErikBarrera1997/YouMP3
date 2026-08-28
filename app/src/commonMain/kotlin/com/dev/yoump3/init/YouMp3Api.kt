@@ -6,6 +6,7 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
@@ -42,6 +43,11 @@ data class AudioSearchResponse(
     val results: List<AudioSearchResult> = emptyList()
 )
 
+@Serializable
+private data class ErrorApiResponse(val message: String? = null)
+
+class ApiException(val apiMessage: String) : Exception(apiMessage)
+
 object YouMp3Api {
     private val client = HttpClient {
         install(ContentNegotiation) {
@@ -59,16 +65,28 @@ object YouMp3Api {
     }
 
     suspend fun searchSongs(videoName: String): AudioSearchResponse {
-        return client.post("${YouMp3ApiConfig.baseUrl}/api/audios/search") {
+        val response = client.post("${YouMp3ApiConfig.baseUrl}/api/audios/search") {
             contentType(ContentType.Application.Json)
             setBody(AudioSearchRequest(videoName))
-        }.body()
+        }
+        ensureApiSuccess(response)
+        return response.body()
     }
 
     suspend fun extractAudio(videoName: String, videoId: String? = null): AudioExtractionResponse {
-        return client.post("${YouMp3ApiConfig.baseUrl}/api/audios/extract") {
+        val response = client.post("${YouMp3ApiConfig.baseUrl}/api/audios/extract") {
             contentType(ContentType.Application.Json)
             setBody(AudioExtractionRequest(videoName, videoId))
-        }.body()
+        }
+        ensureApiSuccess(response)
+        return response.body()
+    }
+
+    private suspend fun ensureApiSuccess(response: HttpResponse) {
+        if (response.status.isSuccess()) return
+        val apiMessage = runCatching { response.body<ErrorApiResponse>().message }
+            .getOrNull()
+            ?: "The service is temporarily unavailable. Try again later."
+        throw ApiException(apiMessage)
     }
 }
