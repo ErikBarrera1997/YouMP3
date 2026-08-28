@@ -29,7 +29,7 @@ actual fun DownloadLink(
     modifier: Modifier
 ) {
     val context = LocalContext.current
-    val permissionLauncher = rememberLauncherForActivityResult(
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
@@ -43,6 +43,12 @@ actual fun DownloadLink(
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        onClick()
+    }
+
     Spacer(Modifier.height(12.dp))
     Text(
         text = text,
@@ -52,14 +58,17 @@ actual fun DownloadLink(
         modifier = modifier
             .fillMaxWidth()
             .clickable(enabled = enabled) {
-                val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+                val needsStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
                     context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
                     PackageManager.PERMISSION_GRANTED
+                val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
 
-                if (needsPermission) {
-                    permissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                } else {
-                    onClick()
+                when {
+                    needsStoragePermission -> storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    needsNotificationPermission -> notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    else -> onClick()
                 }
             }
             .padding(8.dp),

@@ -1,10 +1,13 @@
 package com.dev.yoump3.services
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.FileOutputStream
 
@@ -35,6 +38,7 @@ actual fun saveAudioToDownloads(fileName: String, contentType: String, audioBase
             resolver.delete(uri, null, null)
             throw e
         }
+        showDownloadNotification(fileName)
         return "Descargas/$fileName"
     }
 
@@ -44,5 +48,34 @@ actual fun saveAudioToDownloads(fileName: String, contentType: String, audioBase
     }
     val file = File(downloads, fileName)
     FileOutputStream(file).use { it.write(bytes) }
+    showDownloadNotification(fileName)
     return file.absolutePath
+}
+
+private fun showDownloadNotification(fileName: String) {
+    val context = AppContextProvider.context
+    val channelId = "yoump3_downloads"
+    val notificationManager =
+        context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = NotificationChannel(
+            channelId,
+            "YouMp3 descargas",
+            NotificationManager.IMPORTANCE_DEFAULT
+        )
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    val notification = NotificationCompat.Builder(context, channelId)
+        .setSmallIcon(android.R.drawable.stat_sys_download_done)
+        .setContentTitle("Descarga completada")
+        .setContentText(fileName)
+        .setContentInfo("BY CLEVER CLOUD")
+        .setCategory(NotificationCompat.CATEGORY_SERVICE)
+        .setAutoCancel(true)
+        .setDefaults(NotificationCompat.DEFAULT_ALL)
+        .build()
+
+    notificationManager.notify(System.currentTimeMillis().toInt(), notification)
 }

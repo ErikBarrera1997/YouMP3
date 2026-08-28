@@ -21,13 +21,14 @@ data class SearchResultUi(
 data class SongInputUiState(
     val appTitle: String = "YOUMP3",
     val placeholder: String = "Search for song, artist....",
-    val footer: String = "BY MSSERVICES",
+    val footer: String = "BY CLEVER CLOUD",
     val songQuery: String = "",
     val lastSearchQuery: String = "",
     val searchRequests: Int = 0,
     val isLoading: Boolean = false,
     val searchResults: List<SearchResultUi> = emptyList(),
     val isExtracting: Boolean = false,
+    val isExtractionFailed: Boolean = false,
     val selectedTitle: String? = null,
     val resultTitle: String? = null,
     val resultFormat: String? = null,
@@ -51,6 +52,7 @@ class SongInputViewModel {
             resultTitle = null,
             resultFormat = null,
             resultAudioBase64 = null,
+            isExtractionFailed = false,
             isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
@@ -70,6 +72,7 @@ class SongInputViewModel {
             resultTitle = null,
             resultFormat = null,
             resultAudioBase64 = null,
+            isExtractionFailed = false,
             isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
@@ -116,6 +119,7 @@ class SongInputViewModel {
     fun onSelectResult(videoId: String, title: String) {
         state = state.copy(
             isExtracting = true,
+            isExtractionFailed = false,
             selectedTitle = title,
             resultTitle = null,
             resultFormat = null,
@@ -138,17 +142,20 @@ class SongInputViewModel {
                 } else {
                     state = state.copy(
                         isExtracting = false,
+                        isExtractionFailed = true,
                         errorMessage = response.message
                     )
                 }
             } catch (e: ApiException) {
                 state = state.copy(
                     isExtracting = false,
+                    isExtractionFailed = true,
                     errorMessage = e.apiMessage
                 )
             } catch (e: Exception) {
                 state = state.copy(
                     isExtracting = false,
+                    isExtractionFailed = true,
                     errorMessage = "Service unavailable. Try again later."
                 )
             }
@@ -186,6 +193,7 @@ class SongInputViewModel {
     fun onReturnToInput() {
         state = state.copy(
             isExtracting = false,
+            isExtractionFailed = false,
             isDownloading = false,
             isDownloadFailed = false,
             selectedTitle = null,
@@ -193,8 +201,7 @@ class SongInputViewModel {
             resultFormat = null,
             resultAudioBase64 = null,
             downloadStatus = null,
-            errorMessage = null,
-            searchResults = emptyList()
+            errorMessage = null
         )
     }
 

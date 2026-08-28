@@ -12,7 +12,7 @@ enum class YouMp3Screen {
 data class YouMp3UiState(
     val appTitle: String = "YOUMP3",
     val title: String = "FIND IT!",
-    val footer: String = "BY MSSERVICES",
+    val footer: String = "BY CLEVER CLOUD",
     val currentScreen: YouMp3Screen = YouMp3Screen.Home,
     val findButtonPresses: Int = 0
 )

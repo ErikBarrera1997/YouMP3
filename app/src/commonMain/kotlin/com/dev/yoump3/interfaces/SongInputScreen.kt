@@ -89,12 +89,18 @@ fun SongInputScreenContent(
                     .padding(top = 54.dp)
             ) {
                 when {
-                    state.isExtracting || state.isDownloadFailed -> {
+                    state.isExtracting || state.isDownloading ||
+                        state.isDownloadFailed || state.isExtractionFailed -> {
                         ExtractionStatusView(
-                            isFailed = state.isDownloadFailed,
+                            isFailed = state.isDownloadFailed || state.isExtractionFailed,
                             title = state.selectedTitle ?: state.resultTitle,
                             message = state.errorMessage,
-                            onReturnToInput = viewModel::onReturnToInput
+                            onReturnToInput = viewModel::onReturnToInput,
+                            onRetryDownload = if (state.isDownloadFailed) {
+                                viewModel::onDownloadClick
+                            } else {
+                                null
+                            }
                         )
                     }
 
@@ -167,6 +173,7 @@ fun SongInputScreenContent(
                     }
                 }
             }
+        }
 
             Text(
                 text = state.footer,
@@ -177,7 +184,6 @@ fun SongInputScreenContent(
             )
         }
     }
-}
 }
 
 @Composable
