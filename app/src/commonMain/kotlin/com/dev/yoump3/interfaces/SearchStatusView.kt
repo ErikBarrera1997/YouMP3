@@ -15,8 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -28,7 +26,7 @@ fun SearchStatusView(
             .fillMaxWidth()
             .height(132.dp)
             .background(AppBackground, RoundedCornerShape(10.dp))
-            .border(1.dp, SecondaryText, RoundedCornerShape(10.dp))
+            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -37,7 +35,7 @@ fun SearchStatusView(
                 .padding(top = 14.dp)
         ) {
             CircularProgressIndicator(
-                color = SearchStatusAccent,
+                color = PrimaryText,
                 strokeWidth = 3.dp,
                 modifier = Modifier.size(58.dp)
             )
@@ -50,5 +48,3 @@ fun SearchStatusView(
         }
     }
 }
-
-private val SearchStatusAccent = Color(0xFF4F80E8)

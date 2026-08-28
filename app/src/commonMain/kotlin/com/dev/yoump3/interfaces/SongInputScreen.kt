@@ -17,6 +17,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -30,7 +32,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dev.yoump3.viewModels.SearchResultUi
@@ -43,6 +48,18 @@ fun SongInputScreenContent(
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.state
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val hideKeyboard = {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+    }
+    val submitSearch = {
+        hideKeyboard()
+        if (!state.isLoading && state.songQuery.isNotBlank()) {
+            viewModel.onSearchClick()
+        }
+    }
 
     Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
         BackButton(
@@ -71,53 +88,43 @@ fun SongInputScreenContent(
                     .verticalScroll(rememberScrollState())
                     .padding(top = 54.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 18.dp)
-                ) {
-                    SongInputBox(
-                        value = state.songQuery,
-                        placeholder = state.placeholder,
-                        onValueChange = viewModel::onSongQueryChange,
-                        onSearchClick = viewModel::onSearchClick,
-                        searchEnabled = !state.isLoading && state.songQuery.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(40.dp))
-                    SearchActionButton(
-                        onClick = viewModel::onSearchClick,
-                        enabled = !state.isLoading && state.songQuery.isNotBlank()
-                    )
-                }
-
                 when {
-                    state.isLoading -> {
-                        SearchStatusView(
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
-                    }
-
-                    state.isExtracting -> {
-                        Text(
-                            text = "EXTRAYENDO...",
-                            color = SecondaryText,
-                            textAlign = TextAlign.Center,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        state.selectedTitle?.let { title ->
-                            ResponseText(text = title)
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        CircularProgressIndicator(
-                            color = PrimaryText,
-                            modifier = Modifier.size(24.dp)
+                    state.isExtracting || state.isDownloadFailed -> {
+                        ExtractionStatusView(
+                            isFailed = state.isDownloadFailed,
+                            title = state.selectedTitle ?: state.resultTitle,
+                            message = state.errorMessage,
+                            onReturnToInput = viewModel::onReturnToInput
                         )
                     }
 
                     else -> {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 18.dp)
+                        ) {
+                            SongInputBox(
+                                value = state.songQuery,
+                                placeholder = state.placeholder,
+                                onValueChange = viewModel::onSongQueryChange,
+                                onSearchClick = submitSearch,
+                                searchEnabled = !state.isLoading && state.songQuery.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(40.dp))
+                            SearchActionButton(
+                                onClick = submitSearch,
+                                enabled = !state.isLoading && state.songQuery.isNotBlank()
+                            )
+                        }
+
+                        if (state.isLoading) {
+                            SearchStatusView(
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        } else {
                         if (state.searchResults.isNotEmpty() && state.resultTitle == null) {
                             ResponseText(
                                 text = "MEJORES RESULTADOS",
@@ -262,13 +269,19 @@ private fun SongInputBox(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
+        cursorBrush = SolidColor(PrimaryText),
         textStyle = MaterialTheme.typography.titleLarge.merge(
-            TextStyle(color = AppBackground)
+            TextStyle(color = PrimaryText)
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(
+            onSearch = { onSearchClick() }
         ),
         modifier = modifier
             .height(70.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(PrimaryText)
+            .background(PanelBackground)
+            .border(1.dp, BorderColor, RoundedCornerShape(14.dp))
             .padding(horizontal = 22.dp),
         decorationBox = { innerTextField ->
             Box(
@@ -279,7 +292,7 @@ private fun SongInputBox(
                         if (value.isEmpty()) {
                             Text(
                                 text = placeholder,
-                                color = AppBackground.copy(alpha = 0.55f),
+                                color = SecondaryText,
                                 style = MaterialTheme.typography.titleLarge
                             )
                         }
@@ -289,10 +302,10 @@ private fun SongInputBox(
                     Icon(
                         imageVector = SearchIcon,
                         contentDescription = "Search",
-                        tint = if (searchEnabled) AppBackground else AppBackground.copy(alpha = 0.35f),
+                        tint = if (searchEnabled) PrimaryText else SecondaryText,
                         modifier = Modifier
                             .size(26.dp)
-                            .clickable(enabled = searchEnabled, onClick = onSearchClick)
+                            .clickable(onClick = onSearchClick)
                     )
                 }
             }
@@ -306,16 +319,17 @@ private fun SearchActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor = if (enabled) SearchButtonColor else BorderColor
-    val textColor = if (enabled) AppBackground else SecondaryText
+    val textColor = if (enabled) PrimaryText else SecondaryText
+    val borderColor = if (enabled) PrimaryText else BorderColor
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .height(56.dp)
             .clip(CircleShape)
-            .background(backgroundColor)
-            .clickable(enabled = enabled, onClick = onClick)
+            .background(AppBackground)
+            .border(2.dp, borderColor, CircleShape)
+            .clickable(onClick = onClick)
             .padding(horizontal = 24.dp)
     ) {
         Text(
@@ -326,8 +340,6 @@ private fun SearchActionButton(
         )
     }
 }
-
-private val SearchButtonColor = Color(0xFF4F80E8)
 
 private val SearchIcon = ImageVector.Builder(
     name = "Search",

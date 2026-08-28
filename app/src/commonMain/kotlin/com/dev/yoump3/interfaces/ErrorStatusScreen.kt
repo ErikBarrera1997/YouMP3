@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
@@ -61,7 +62,7 @@ private val CloudOffIcon = ImageVector.Builder(
     viewportWidth = 24f,
     viewportHeight = 24f
 ).apply {
-    path(fill = SolidColor(Color.Black)) {
+    path(fill = SolidColor(ErrorIconColor)) {
         moveTo(19.35f, 10.04f)
         curveTo(18.67f, 6.59f, 15.64f, 4f, 12f, 4f)
         curveTo(9.11f, 4f, 6.6f, 5.64f, 5.35f, 8.04f)
@@ -72,12 +73,23 @@ private val CloudOffIcon = ImageVector.Builder(
         curveTo(24f, 12.36f, 21.95f, 10.22f, 19.35f, 10.04f)
         close()
     }
-    path(fill = SolidColor(Color.Black)) {
-        moveTo(5f, 2f)
-        lineTo(7.2f, 2f)
-        lineTo(21.5f, 21.5f)
-        lineTo(19.3f, 21.5f)
-        close()
+    path(
+        fill = null,
+        stroke = SolidColor(ErrorBackground),
+        strokeLineWidth = 4.4f,
+        strokeLineCap = StrokeCap.Round
+    ) {
+        moveTo(4f, 4.2f)
+        lineTo(19.8f, 20f)
+    }
+    path(
+        fill = null,
+        stroke = SolidColor(ErrorIconColor),
+        strokeLineWidth = 2.4f,
+        strokeLineCap = StrokeCap.Round
+    ) {
+        moveTo(4f, 4.2f)
+        lineTo(19.8f, 20f)
     }
 }.build()
 
@@ -135,11 +147,11 @@ fun ErrorStatusScreen(
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(horizontal = 28.dp, vertical = 24.dp)
+                .padding(horizontal = 28.dp)
+                .padding(top = 36.dp)
         ) {
             ErrorStatusIcon()
 
@@ -288,7 +300,7 @@ private fun ErrorStatusIcon() {
             Icon(
                 imageVector = CloudOffIcon,
                 contentDescription = null,
-                tint = ErrorIconColor,
+                tint = Color.Unspecified,
                 modifier = Modifier.size(60.dp)
             )
         }

@@ -32,6 +32,7 @@ data class SongInputUiState(
     val resultFormat: String? = null,
     val resultAudioBase64: String? = null,
     val isDownloading: Boolean = false,
+    val isDownloadFailed: Boolean = false,
     val downloadStatus: String? = null,
     val errorMessage: String? = null
 )
@@ -49,6 +50,7 @@ class SongInputViewModel {
             resultTitle = null,
             resultFormat = null,
             resultAudioBase64 = null,
+            isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
         )
@@ -67,6 +69,7 @@ class SongInputViewModel {
             resultTitle = null,
             resultFormat = null,
             resultAudioBase64 = null,
+            isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
         )
@@ -111,6 +114,7 @@ class SongInputViewModel {
             resultTitle = null,
             resultFormat = null,
             resultAudioBase64 = null,
+            isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
         )
@@ -145,6 +149,7 @@ class SongInputViewModel {
 
         state = state.copy(
             isDownloading = true,
+            isDownloadFailed = false,
             downloadStatus = null,
             errorMessage = null
         )
@@ -160,10 +165,26 @@ class SongInputViewModel {
             } catch (e: Exception) {
                 state = state.copy(
                     isDownloading = false,
-                    errorMessage = "Error al descargar: ${e.message ?: "no se pudo guardar el archivo"}"
+                    isDownloadFailed = true,
+                    errorMessage = e.message ?: "no se pudo guardar el archivo"
                 )
             }
         }
+    }
+
+    fun onReturnToInput() {
+        state = state.copy(
+            isExtracting = false,
+            isDownloading = false,
+            isDownloadFailed = false,
+            selectedTitle = null,
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
+            errorMessage = null,
+            searchResults = emptyList()
+        )
     }
 
     private fun resolveFormat(contentType: String?, fileName: String?): String {
