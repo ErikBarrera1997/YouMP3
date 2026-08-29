@@ -1,15 +1,22 @@
 package com.dev.yoump3.interfaces
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,48 +29,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.generated.resources.Res
+import com.dev.yoump3.generated.resources.icon
 import com.dev.yoump3.init.InitScreen
 import com.dev.yoump3.viewModels.ErrorStatusViewModel
 import com.dev.yoump3.viewModels.SongInputViewModel
 import com.dev.yoump3.viewModels.YouMp3Screen
 import com.dev.yoump3.viewModels.YouMp3ViewModel
+import kotlin.math.roundToInt
+import org.jetbrains.compose.resources.painterResource
 
 internal val AppBackground = Color(0xFF111111)
 internal val PanelBackground = Color(0xFF181818)
 internal val BorderColor = Color(0xFF2B2B2B)
 internal val PrimaryText = Color(0xFFFFFFFF)
 internal val SecondaryText = Color(0xFFAEBBD2)
-private val MaterialMusicNote = ImageVector.Builder(
-    name = "MaterialMusicNote",
-    defaultWidth = 24.dp,
-    defaultHeight = 24.dp,
-    viewportWidth = 24f,
-    viewportHeight = 24f
-).apply {
-    path(fill = SolidColor(Color.Black)) {
-        moveTo(12f, 3f)
-        verticalLineToRelative(10.55f)
-        curveToRelative(-0.59f, -0.34f, -1.27f, -0.55f, -2f, -0.55f)
-        curveToRelative(-2.21f, 0f, -4f, 1.79f, -4f, 4f)
-        reflectiveCurveToRelative(1.79f, 4f, 4f, 4f)
-        reflectiveCurveToRelative(4f, -1.79f, 4f, -4f)
-        verticalLineTo(7f)
-        horizontalLineToRelative(4f)
-        verticalLineTo(3f)
-        horizontalLineToRelative(-6f)
-        close()
-    }
-}.build()
 
 @Composable
 fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExit: () -> Unit = {}) {
@@ -141,24 +129,36 @@ fun YouMp3Screen(
         contentColor = PrimaryText,
         modifier = modifier
     ) {
-        when (state.currentScreen) {
-            YouMp3Screen.Home -> FindItScreenContent(
-                appTitle = state.appTitle,
-                title = state.title,
-                footer = state.footer,
-                onFindClick = viewModel::onFindButtonClick,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(AppBackground)
-            )
+        AnimatedContent(
+            targetState = state.currentScreen,
+            transitionSpec = {
+                val forward = targetState == YouMp3Screen.SongInput
+                val enterOffset = if (forward) 0.25f else -0.25f
+                val exitOffset = if (forward) -0.25f else 0.25f
+                (fadeIn(tween(260)) + slideInHorizontally(tween(260)) { (it * enterOffset).roundToInt() }) togetherWith
+                    (fadeOut(tween(220)) + slideOutHorizontally(tween(220)) { (it * exitOffset).roundToInt() })
+            },
+            label = "main-screens"
+        ) { screen ->
+            when (screen) {
+                YouMp3Screen.Home -> FindItScreenContent(
+                    appTitle = state.appTitle,
+                    title = state.title,
+                    footer = state.footer,
+                    onFindClick = viewModel::onFindButtonClick,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppBackground)
+                )
 
-            YouMp3Screen.SongInput -> SongInputScreenContent(
-                viewModel = songInputViewModel,
-                onCloseClick = viewModel::onCloseSongInputClick,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(AppBackground)
-            )
+                YouMp3Screen.SongInput -> SongInputScreenContent(
+                    viewModel = songInputViewModel,
+                    onCloseClick = viewModel::onCloseSongInputClick,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppBackground)
+                )
+            }
         }
     }
 }
@@ -242,10 +242,10 @@ private fun MusicNoteCircleButton(onClick: () -> Unit) {
             )
             .padding(42.dp)
     ) {
-        Icon(
-            imageVector = MaterialMusicNote,
+        Image(
+            painter = painterResource(Res.drawable.icon),
             contentDescription = "Music note",
-            tint = PrimaryText,
+            contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
         )
     }

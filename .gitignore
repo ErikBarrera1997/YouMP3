@@ -9,6 +9,14 @@ captures
 .cxx
 *.jks
 *.keystore
+keystore.properties
 .DS_Store
 Thumbs.db
 .env
+!*.png
+!*.jpg
+!*.jpeg
+!*.webp
+!*.gif
+!*.svg
+!*.bmp

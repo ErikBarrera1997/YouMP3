@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,17 +33,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.generated.resources.Res
+import com.dev.yoump3.generated.resources.server_error
 import com.dev.yoump3.viewModels.ErrorStatusViewModel
+import org.jetbrains.compose.resources.painterResource
 
 private val ErrorBackground = Color(0xFF0A0A0A)
 private val ErrorSurface = Color(0xFF131313)
@@ -50,48 +54,9 @@ private val ErrorOnSurface = Color(0xFFE5E2E1)
 private val ErrorOutline = Color(0xFF8B90A0)
 private val ErrorPrimary = Color(0xFFADC7FF)
 private val ErrorOnPrimary = Color(0xFF002E68)
-private val ErrorIconColor = Color(0xFFFFB4AB)
 private val RingInner = Color(0xFF353534)
 private val RingOuter = Color(0xFF201F1F)
 private val IconCircleBorder = Color(0xFF414754)
-
-private val CloudOffIcon = ImageVector.Builder(
-    name = "CloudOff",
-    defaultWidth = 24.dp,
-    defaultHeight = 24.dp,
-    viewportWidth = 24f,
-    viewportHeight = 24f
-).apply {
-    path(fill = SolidColor(ErrorIconColor)) {
-        moveTo(19.35f, 10.04f)
-        curveTo(18.67f, 6.59f, 15.64f, 4f, 12f, 4f)
-        curveTo(9.11f, 4f, 6.6f, 5.64f, 5.35f, 8.04f)
-        curveTo(2.34f, 8.36f, 0f, 10.91f, 0f, 14f)
-        curveTo(0f, 17.31f, 2.69f, 20f, 6f, 20f)
-        horizontalLineTo(19f)
-        curveTo(21.76f, 20f, 24f, 17.76f, 24f, 15f)
-        curveTo(24f, 12.36f, 21.95f, 10.22f, 19.35f, 10.04f)
-        close()
-    }
-    path(
-        fill = null,
-        stroke = SolidColor(ErrorBackground),
-        strokeLineWidth = 4.4f,
-        strokeLineCap = StrokeCap.Round
-    ) {
-        moveTo(4f, 4.2f)
-        lineTo(19.8f, 20f)
-    }
-    path(
-        fill = null,
-        stroke = SolidColor(ErrorIconColor),
-        strokeLineWidth = 2.4f,
-        strokeLineCap = StrokeCap.Round
-    ) {
-        moveTo(4f, 4.2f)
-        lineTo(19.8f, 20f)
-    }
-}.build()
 
 private val ChevronLeftIcon = ImageVector.Builder(
     name = "ChevronLeft",
@@ -297,11 +262,11 @@ private fun ErrorStatusIcon() {
                 .size(128.dp)
                 .border(1.dp, IconCircleBorder, CircleShape)
         ) {
-            Icon(
-                imageVector = CloudOffIcon,
+            Image(
+                painter = painterResource(Res.drawable.server_error),
                 contentDescription = null,
-                tint = Color.Unspecified,
-                modifier = Modifier.size(60.dp)
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(112.dp)
             )
         }
     }

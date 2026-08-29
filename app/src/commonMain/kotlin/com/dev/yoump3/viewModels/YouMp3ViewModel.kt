@@ -3,6 +3,7 @@ package com.dev.yoump3.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.dev.yoump3.appVersion
 
 enum class YouMp3Screen {
     Home,
@@ -12,7 +13,7 @@ enum class YouMp3Screen {
 data class YouMp3UiState(
     val appTitle: String = "YOUMP3",
     val title: String = "FIND IT!",
-    val footer: String = "BY CLEVER CLOUD",
+    val footer: String = "BY CLEVER CLOUD · v$appVersion",
     val currentScreen: YouMp3Screen = YouMp3Screen.Home,
     val findButtonPresses: Int = 0
 )

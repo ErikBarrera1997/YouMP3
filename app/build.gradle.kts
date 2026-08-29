@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.multiplatform")
@@ -21,6 +23,7 @@ kotlin {
                 implementation(compose.foundation)
                 implementation(compose.material3)
                 implementation(compose.ui)
+                implementation(compose.components.resources)
                 implementation("io.ktor:ktor-client-core:3.0.3")
                 implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
@@ -44,6 +47,13 @@ kotlin {
     }
 }
 
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     namespace = "com.dev.yoump3"
     compileSdk = 36
@@ -52,16 +62,33 @@ android {
         applicationId = "com.dev.yoump3"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 9
+        versionName = "1.9.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        getByName("debug")
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = file(keystoreProperties.getProperty("storeFile") as String)
+                storePassword = keystoreProperties.getProperty("storePassword") as String
+                keyAlias = keystoreProperties.getProperty("keyAlias") as String
+                keyPassword = keystoreProperties.getProperty("keyPassword") as String
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
@@ -70,6 +97,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -80,9 +108,15 @@ compose.desktop {
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "YouMp3"
-            packageVersion = "1.0.0"
+            packageVersion = "1.9.0"
         }
     }
+}
+
+compose.resources {
+    publicResClass = true
+    packageOfResClass = "com.dev.yoump3.generated.resources"
+    generateResClass = always
 }
 
 dependencies {

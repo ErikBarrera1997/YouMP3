@@ -3,6 +3,7 @@ package com.dev.yoump3.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.dev.yoump3.appVersion
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
 import com.dev.yoump3.services.saveAudioToDownloads
@@ -21,7 +22,7 @@ data class SearchResultUi(
 data class SongInputUiState(
     val appTitle: String = "YOUMP3",
     val placeholder: String = "Search for song, artist....",
-    val footer: String = "BY CLEVER CLOUD",
+    val footer: String = "BY CLEVER CLOUD · v$appVersion",
     val songQuery: String = "",
     val lastSearchQuery: String = "",
     val searchRequests: Int = 0,
