@@ -7,7 +7,8 @@ import com.dev.yoump3.appVersion
 
 enum class YouMp3Screen {
     Home,
-    SongInput
+    SongInput,
+    Settings
 }
 
 data class YouMp3UiState(
@@ -33,12 +34,25 @@ class YouMp3ViewModel {
         state = state.copy(currentScreen = YouMp3Screen.Home)
     }
 
+    fun onSettingsClick() {
+        state = state.copy(currentScreen = YouMp3Screen.Settings)
+    }
+
+    fun onCloseSettingsClick() {
+        state = state.copy(currentScreen = YouMp3Screen.Home)
+    }
+
     fun onBackClick(): Boolean {
-        return if (state.currentScreen == YouMp3Screen.SongInput) {
-            onCloseSongInputClick()
-            true
-        } else {
-            false
+        return when (state.currentScreen) {
+            YouMp3Screen.SongInput -> {
+                onCloseSongInputClick()
+                true
+            }
+            YouMp3Screen.Settings -> {
+                onCloseSettingsClick()
+                true
+            }
+            YouMp3Screen.Home -> false
         }
     }
 }

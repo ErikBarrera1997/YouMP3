@@ -17,6 +17,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -29,7 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -132,7 +136,7 @@ fun YouMp3Screen(
         AnimatedContent(
             targetState = state.currentScreen,
             transitionSpec = {
-                val forward = targetState == YouMp3Screen.SongInput
+                val forward = targetState != YouMp3Screen.Home
                 val enterOffset = if (forward) 0.25f else -0.25f
                 val exitOffset = if (forward) -0.25f else 0.25f
                 (fadeIn(tween(260)) + slideInHorizontally(tween(260)) { (it * enterOffset).roundToInt() }) togetherWith
@@ -146,6 +150,7 @@ fun YouMp3Screen(
                     title = state.title,
                     footer = state.footer,
                     onFindClick = viewModel::onFindButtonClick,
+                    onSettingsClick = viewModel::onSettingsClick,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(AppBackground)
@@ -154,6 +159,14 @@ fun YouMp3Screen(
                 YouMp3Screen.SongInput -> SongInputScreenContent(
                     viewModel = songInputViewModel,
                     onCloseClick = viewModel::onCloseSongInputClick,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(AppBackground)
+                )
+
+                YouMp3Screen.Settings -> SettingsScreenContent(
+                    onCloseClick = viewModel::onCloseSettingsClick,
+                    footer = state.footer,
                     modifier = Modifier
                         .fillMaxSize()
                         .background(AppBackground)
@@ -169,47 +182,81 @@ private fun FindItScreenContent(
     title: String,
     footer: String,
     onFindClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .padding(horizontal = 28.dp, vertical = 34.dp)
-    ) {
+    Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
         Column(
+            verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(PanelBackground)
-                .border(1.dp, BorderColor)
-                .padding(vertical = 18.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(PanelBackground)
+                    .border(1.dp, BorderColor)
+                    .padding(vertical = 18.dp)
+            ) {
+                SettingsButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .padding(start = 14.dp)
+                )
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = appTitle,
+                        color = PrimaryText,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.displayLarge
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = title,
+                        color = SecondaryText,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+            }
+
+            MusicNoteCircleButton(onClick = onFindClick)
+
             Text(
-                text = appTitle,
-                color = PrimaryText,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.displayLarge
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = title,
+                text = footer,
                 color = SecondaryText,
                 modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center,
+                textAlign = TextAlign.End,
                 style = MaterialTheme.typography.labelMedium
             )
         }
+    }
+}
 
-        MusicNoteCircleButton(onClick = onFindClick)
-
-        Text(
-            text = footer,
-            color = SecondaryText,
-            modifier = Modifier.fillMaxWidth(),
-            textAlign = TextAlign.End,
-            style = MaterialTheme.typography.labelMedium
+@Composable
+private fun SettingsButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick)
+    ) {
+        Icon(
+            imageVector = SettingsIcon,
+            contentDescription = "Ajustes",
+            tint = PrimaryText,
+            modifier = Modifier.size(24.dp)
         )
     }
 }
@@ -250,3 +297,60 @@ private fun MusicNoteCircleButton(onClick: () -> Unit) {
         )
     }
 }
+
+private val SettingsIcon = ImageVector.Builder(
+    name = "Settings",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).apply {
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(19.14f, 12.94f)
+        curveToRelative(0.04f, -0.3f, 0.06f, -0.61f, 0.06f, -0.94f)
+        curveToRelative(0f, -0.32f, -0.02f, -0.64f, -0.07f, -0.94f)
+        lineToRelative(2.03f, -1.58f)
+        curveToRelative(0.18f, -0.14f, 0.23f, -0.41f, 0.12f, -0.61f)
+        lineToRelative(-1.92f, -3.32f)
+        curveToRelative(-0.12f, -0.22f, -0.37f, -0.29f, -0.59f, -0.22f)
+        lineToRelative(-2.39f, 0.96f)
+        curveToRelative(-0.5f, -0.38f, -1.03f, -0.7f, -1.62f, -0.94f)
+        lineToRelative(-0.36f, -2.54f)
+        curveToRelative(-0.04f, -0.24f, -0.24f, -0.41f, -0.48f, -0.41f)
+        horizontalLineToRelative(-3.84f)
+        curveToRelative(-0.24f, 0f, -0.43f, 0.17f, -0.47f, 0.41f)
+        lineToRelative(-0.36f, 2.54f)
+        curveToRelative(-0.59f, 0.24f, -1.13f, 0.57f, -1.62f, 0.94f)
+        lineToRelative(-2.39f, -0.96f)
+        curveToRelative(-0.22f, -0.08f, -0.47f, 0f, -0.59f, 0.22f)
+        lineTo(2.74f, 8.87f)
+        curveToRelative(-0.12f, 0.21f, -0.08f, 0.47f, 0.12f, 0.61f)
+        lineToRelative(2.03f, 1.58f)
+        curveToRelative(-0.05f, 0.3f, -0.09f, 0.63f, -0.09f, 0.94f)
+        reflectiveCurveToRelative(0.02f, 0.64f, 0.07f, 0.94f)
+        lineToRelative(-2.03f, 1.58f)
+        curveToRelative(-0.18f, 0.14f, -0.23f, 0.41f, -0.12f, 0.61f)
+        lineToRelative(1.92f, 3.32f)
+        curveToRelative(0.12f, 0.22f, 0.37f, 0.29f, 0.59f, 0.22f)
+        lineToRelative(2.39f, -0.96f)
+        curveToRelative(0.5f, 0.38f, 1.03f, 0.7f, 1.62f, 0.94f)
+        lineToRelative(0.36f, 2.54f)
+        curveToRelative(0.05f, 0.24f, 0.24f, 0.41f, 0.48f, 0.41f)
+        horizontalLineToRelative(3.84f)
+        curveToRelative(0.24f, 0f, 0.44f, -0.17f, 0.47f, -0.41f)
+        lineToRelative(0.36f, -2.54f)
+        curveToRelative(0.59f, -0.24f, 1.13f, -0.56f, 1.62f, -0.94f)
+        lineToRelative(2.39f, 0.96f)
+        curveToRelative(0.22f, 0.08f, 0.47f, 0f, 0.59f, -0.22f)
+        lineToRelative(1.92f, -3.32f)
+        curveToRelative(0.12f, -0.22f, 0.07f, -0.47f, -0.12f, -0.61f)
+        lineToRelative(-2.01f, -1.58f)
+        close()
+        moveTo(12f, 15.5f)
+        curveToRelative(-1.93f, 0f, -3.5f, -1.57f, -3.5f, -3.5f)
+        reflectiveCurveToRelative(1.57f, -3.5f, 3.5f, -3.5f)
+        reflectiveCurveToRelative(3.5f, 1.57f, 3.5f, 3.5f)
+        reflectiveCurveToRelative(-1.57f, 3.5f, -3.5f, 3.5f)
+        close()
+    }
+}.build()
