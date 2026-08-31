@@ -191,6 +191,21 @@ class SongInputViewModel {
         }
     }
 
+    fun onReturnToResults() {
+        state = state.copy(
+            isExtracting = false,
+            isExtractionFailed = false,
+            isDownloading = false,
+            isDownloadFailed = false,
+            selectedTitle = null,
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
+            errorMessage = null
+        )
+    }
+
     fun onReturnToInput() {
         state = state.copy(
             isExtracting = false,

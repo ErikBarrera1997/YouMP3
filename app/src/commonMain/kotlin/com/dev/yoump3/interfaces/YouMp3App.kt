@@ -1,7 +1,12 @@
 package com.dev.yoump3.interfaces
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -227,7 +232,22 @@ private fun FindItScreenContent(
                 }
             }
 
-            MusicNoteCircleButton(onClick = onFindClick)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(bottom = 36.dp)
+            ) {
+                MusicNoteCircleButton(onClick = onFindClick)
+                Spacer(Modifier.height(28.dp))
+                Text(
+                    text = "Toca el botón para empezar",
+                    color = SecondaryText,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
 
             Text(
                 text = footer,
@@ -265,36 +285,98 @@ private fun SettingsButton(
 private fun MusicNoteCircleButton(onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed = interactionSource.collectIsPressedAsState().value
-    val scale = animateFloatAsState(
+    val pressScale = animateFloatAsState(
         targetValue = if (isPressed) 1.14f else 1f,
         animationSpec = spring(),
         label = "music-note-button-scale"
     )
 
+    val infiniteTransition = rememberInfiniteTransition(label = "music-note-pulse-glow")
+
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse-scale"
+    )
+
+    val glowRingScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.28f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glow-ring-scale"
+    )
+
+    val glowRingAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "glow-ring-alpha"
+    )
+
+    val glowBorderAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow-border-alpha"
+    )
+
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(190.dp)
-            .graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-            }
-            .clip(CircleShape)
-            .background(AppBackground)
-            .border(5.dp, PrimaryText, CircleShape)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            )
-            .padding(42.dp)
+        modifier = Modifier.size(230.dp)
     ) {
-        Image(
-            painter = painterResource(Res.drawable.icon),
-            contentDescription = "Music note",
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier
+                .size(190.dp)
+                .graphicsLayer {
+                    val scale = glowRingScale * pressScale.value
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = glowRingAlpha
+                }
+                .clip(CircleShape)
+                .background(PrimaryText.copy(alpha = 0.12f))
+                .border(2.dp, PrimaryText.copy(alpha = glowBorderAlpha), CircleShape)
         )
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(190.dp)
+                .graphicsLayer {
+                    val totalScale = pressScale.value * pulseScale
+                    scaleX = totalScale
+                    scaleY = totalScale
+                }
+                .clip(CircleShape)
+                .background(AppBackground)
+                .border(5.dp, PrimaryText, CircleShape)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                )
+                .padding(42.dp)
+        ) {
+            Image(
+                painter = painterResource(Res.drawable.icon),
+                contentDescription = "Music note",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
     }
 }
 

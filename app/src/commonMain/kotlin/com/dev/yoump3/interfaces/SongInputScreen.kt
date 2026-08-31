@@ -63,7 +63,13 @@ fun SongInputScreenContent(
 
     Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
         BackButton(
-            onClick = onCloseClick,
+            onClick = {
+                if (state.resultTitle != null && state.searchResults.isNotEmpty()) {
+                    viewModel.onReturnToResults()
+                } else {
+                    onCloseClick()
+                }
+            },
             modifier = Modifier.align(Alignment.TopStart)
         )
 
@@ -95,7 +101,13 @@ fun SongInputScreenContent(
                             isFailed = state.isDownloadFailed || state.isExtractionFailed,
                             title = state.selectedTitle ?: state.resultTitle,
                             message = state.errorMessage,
-                            onReturnToInput = viewModel::onReturnToInput,
+                            onReturnToInput = {
+                                if (state.searchResults.isNotEmpty()) {
+                                    viewModel.onReturnToResults()
+                                } else {
+                                    viewModel.onReturnToInput()
+                                }
+                            },
                             onRetryDownload = if (state.isDownloadFailed) {
                                 viewModel::onDownloadClick
                             } else {

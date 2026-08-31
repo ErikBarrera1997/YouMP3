@@ -62,8 +62,8 @@ android {
         applicationId = "com.dev.yoump3"
         minSdk = 24
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.9.0"
+        versionCode = 10
+        versionName = "1.9.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -108,7 +108,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "YouMp3"
-            packageVersion = "1.9.0"
+            packageVersion = "1.9.2"
         }
     }
 }
