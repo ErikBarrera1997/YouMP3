@@ -26,16 +26,20 @@ data class CachedAudioExtraction(
 )
 
 object AudioExtractionCache {
-    private val cache = mutableMapOf<String, CachedAudioExtraction>()
+    private var cachedVideoId: String? = null
+    private var cachedData: CachedAudioExtraction? = null
 
-    fun get(videoId: String): CachedAudioExtraction? = cache[videoId]
+    fun get(videoId: String): CachedAudioExtraction? =
+        if (videoId == cachedVideoId) cachedData else null
 
     fun put(videoId: String, data: CachedAudioExtraction) {
-        cache[videoId] = data
+        cachedVideoId = videoId
+        cachedData = data
     }
 
     fun clear() {
-        cache.clear()
+        cachedVideoId = null
+        cachedData = null
     }
 }
 
