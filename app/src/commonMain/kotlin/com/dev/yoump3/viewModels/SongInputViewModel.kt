@@ -19,6 +19,26 @@ data class SearchResultUi(
     val durationSeconds: Long?
 )
 
+data class CachedAudioExtraction(
+    val resultTitle: String,
+    val resultFormat: String,
+    val resultAudioBase64: String
+)
+
+object AudioExtractionCache {
+    private val cache = mutableMapOf<String, CachedAudioExtraction>()
+
+    fun get(videoId: String): CachedAudioExtraction? = cache[videoId]
+
+    fun put(videoId: String, data: CachedAudioExtraction) {
+        cache[videoId] = data
+    }
+
+    fun clear() {
+        cache.clear()
+    }
+}
+
 data class SongInputUiState(
     val appTitle: String = "YOUMP3",
     val placeholder: String = "Search for song, artist....",
@@ -47,8 +67,9 @@ class SongInputViewModel {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun onSongQueryChange(value: String) {
+        val sanitized = sanitizeSongQuery(value)
         state = state.copy(
-            songQuery = value,
+            songQuery = sanitized,
             searchResults = emptyList(),
             resultTitle = null,
             resultFormat = null,
@@ -58,6 +79,12 @@ class SongInputViewModel {
             downloadStatus = null,
             errorMessage = null
         )
+    }
+
+    private fun sanitizeSongQuery(query: String): String {
+        return query.filter { char ->
+            char.isLetterOrDigit() || char.isWhitespace() || char == '-'
+        }
     }
 
     fun onSearchClick() {
@@ -118,6 +145,23 @@ class SongInputViewModel {
     }
 
     fun onSelectResult(videoId: String, title: String) {
+        val cached = AudioExtractionCache.get(videoId)
+        if (cached != null) {
+            state = state.copy(
+                isExtracting = false,
+                isExtractionFailed = false,
+                selectedTitle = title,
+                resultTitle = cached.resultTitle,
+                resultFormat = cached.resultFormat,
+                resultAudioBase64 = cached.resultAudioBase64,
+                isDownloading = false,
+                isDownloadFailed = false,
+                downloadStatus = null,
+                errorMessage = null
+            )
+            return
+        }
+
         state = state.copy(
             isExtracting = true,
             isExtractionFailed = false,
@@ -133,12 +177,25 @@ class SongInputViewModel {
         scope.launch {
             try {
                 val response = YouMp3Api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
-                if (response.success) {
+                if (response.success && response.audioBase64 != null) {
+                    val resolvedTitle = response.videoTitle ?: title
+                    val resolvedFormat = resolveFormat(response.contentType, response.fileName)
+                    val audioBase64 = response.audioBase64
+
+                    AudioExtractionCache.put(
+                        videoId = videoId,
+                        data = CachedAudioExtraction(
+                            resultTitle = resolvedTitle,
+                            resultFormat = resolvedFormat,
+                            resultAudioBase64 = audioBase64
+                        )
+                    )
+
                     state = state.copy(
                         isExtracting = false,
-                        resultTitle = response.videoTitle ?: title,
-                        resultFormat = resolveFormat(response.contentType, response.fileName),
-                        resultAudioBase64 = response.audioBase64
+                        resultTitle = resolvedTitle,
+                        resultFormat = resolvedFormat,
+                        resultAudioBase64 = audioBase64
                     )
                 } else {
                     state = state.copy(
