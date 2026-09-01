@@ -48,16 +48,6 @@ import com.dev.yoump3.generated.resources.server_error
 import com.dev.yoump3.viewModels.ErrorStatusViewModel
 import org.jetbrains.compose.resources.painterResource
 
-private val ErrorBackground = Color(0xFF0A0A0A)
-private val ErrorSurface = Color(0xFF131313)
-private val ErrorOnSurface = Color(0xFFE5E2E1)
-private val ErrorOutline = Color(0xFF8B90A0)
-private val ErrorPrimary = Color(0xFFADC7FF)
-private val ErrorOnPrimary = Color(0xFF002E68)
-private val RingInner = Color(0xFF353534)
-private val RingOuter = Color(0xFF201F1F)
-private val IconCircleBorder = Color(0xFF414754)
-
 private val ChevronLeftIcon = ImageVector.Builder(
     name = "ChevronLeft",
     defaultWidth = 24.dp,
@@ -106,7 +96,7 @@ fun ErrorStatusScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(ErrorBackground)
+            .background(AppBackground)
     ) {
         ErrorStatusTopBar(onBackClick = onGoBackToHome)
 
@@ -124,7 +114,7 @@ fun ErrorStatusScreen(
 
             Text(
                 text = viewModel.state.title,
-                color = ErrorOnSurface,
+                color = PrimaryText,
                 textAlign = TextAlign.Center,
                 style = TextStyle(
                     fontFamily = FontFamily.SansSerif,
@@ -138,7 +128,7 @@ fun ErrorStatusScreen(
 
             Text(
                 text = viewModel.state.message,
-                color = ErrorOutline,
+                color = SecondaryText,
                 textAlign = TextAlign.Center,
                 style = TextStyle(
                     fontFamily = FontFamily.SansSerif,
@@ -155,6 +145,14 @@ fun ErrorStatusScreen(
                 onClick = onGoBackToHome
             )
         }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp, vertical = 34.dp)
+        ) {
+            AppFooter()
+        }
     }
 }
 
@@ -165,7 +163,7 @@ private fun ErrorStatusTopBar(onBackClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(64.dp)
-            .background(ErrorSurface)
+            .background(PanelBackground)
             .padding(horizontal = 20.dp)
     ) {
         Box(
@@ -178,7 +176,7 @@ private fun ErrorStatusTopBar(onBackClick: () -> Unit) {
             Icon(
                 imageVector = ChevronLeftIcon,
                 contentDescription = null,
-                tint = ErrorPrimary,
+                tint = PrimaryText,
                 modifier = Modifier.size(28.dp)
             )
         }
@@ -189,78 +187,115 @@ private fun ErrorStatusTopBar(onBackClick: () -> Unit) {
 
 @Composable
 private fun ErrorStatusIcon() {
-    val transition = rememberInfiniteTransition(label = "error-status-rings")
+    val transition = rememberInfiniteTransition(label = "error-status-wave")
 
-    val innerScale by transition.animateFloat(
+    val pulseScale by transition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.6f,
+        targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "error-icon-pulse-scale"
+    )
+
+    val wave1Scale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.32f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
             initialStartOffset = StartOffset(0)
         ),
-        label = "inner-ring-scale"
+        label = "error-wave-scale-1"
     )
-    val innerAlpha by transition.animateFloat(
-        initialValue = 0.5f,
+    val wave1Alpha by transition.animateFloat(
+        initialValue = 0.28f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
             initialStartOffset = StartOffset(0)
         ),
-        label = "inner-ring-alpha"
+        label = "error-wave-alpha-1"
     )
-    val outerScale by transition.animateFloat(
+
+    val wave2Scale by transition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.6f,
+        targetValue = 1.32f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
-            initialStartOffset = StartOffset(750)
+            initialStartOffset = StartOffset(1000)
         ),
-        label = "outer-ring-scale"
+        label = "error-wave-scale-2"
     )
-    val outerAlpha by transition.animateFloat(
-        initialValue = 0.3f,
+    val wave2Alpha by transition.animateFloat(
+        initialValue = 0.20f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4000, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 2000, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart,
-            initialStartOffset = StartOffset(750)
+            initialStartOffset = StartOffset(1000)
         ),
-        label = "outer-ring-alpha"
+        label = "error-wave-alpha-2"
+    )
+
+    val borderGlowAlpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.75f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "error-border-glow-alpha"
     )
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(160.dp)
+        modifier = Modifier.size(190.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .graphicsLayer {
-                    scaleX = outerScale
-                    scaleY = outerScale
-                    alpha = outerAlpha
-                }
-                .border(1.dp, RingOuter, CircleShape)
-        )
         Box(
             modifier = Modifier
                 .size(128.dp)
                 .graphicsLayer {
-                    scaleX = innerScale
-                    scaleY = innerScale
-                    alpha = innerAlpha
+                    scaleX = wave2Scale
+                    scaleY = wave2Scale
+                    alpha = wave2Alpha
                 }
-                .border(1.dp, RingInner, CircleShape)
+                .clip(CircleShape)
+                .background(PrimaryText.copy(alpha = 0.08f))
+                .border(1.5.dp, PrimaryText.copy(alpha = 0.5f), CircleShape)
         )
+
+        Box(
+            modifier = Modifier
+                .size(128.dp)
+                .graphicsLayer {
+                    scaleX = wave1Scale
+                    scaleY = wave1Scale
+                    alpha = wave1Alpha
+                }
+                .clip(CircleShape)
+                .background(PrimaryText.copy(alpha = 0.10f))
+                .border(1.5.dp, PrimaryText.copy(alpha = 0.7f), CircleShape)
+        )
+
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(128.dp)
-                .border(1.dp, IconCircleBorder, CircleShape)
+                .graphicsLayer {
+                    scaleX = pulseScale
+                    scaleY = pulseScale
+                }
+                .clip(CircleShape)
+                .background(PanelBackground)
+                .border(
+                    2.dp,
+                    AccentText.copy(alpha = borderGlowAlpha),
+                    CircleShape
+                )
         ) {
             Image(
                 painter = painterResource(Res.drawable.server_error),
@@ -283,13 +318,13 @@ private fun ErrorStatusButton(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(ErrorPrimary)
+            .background(PrimaryText)
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Text(
             text = text,
-            color = ErrorOnPrimary,
+            color = AppBackground,
             style = TextStyle(
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
@@ -300,7 +335,7 @@ private fun ErrorStatusButton(
         Icon(
             imageVector = ArrowForwardIcon,
             contentDescription = null,
-            tint = ErrorOnPrimary,
+            tint = AppBackground,
             modifier = Modifier.size(20.dp)
         )
     }

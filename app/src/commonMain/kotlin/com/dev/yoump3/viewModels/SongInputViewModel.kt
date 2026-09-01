@@ -7,9 +7,12 @@ import com.dev.yoump3.appVersion
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
 import com.dev.yoump3.services.saveAudioToDownloads
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class SearchResultUi(
@@ -69,6 +72,7 @@ class SongInputViewModel {
         private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var extractionJob: Job? = null
 
     fun onSongQueryChange(value: String) {
         val sanitized = sanitizeSongQuery(value)
@@ -86,8 +90,17 @@ class SongInputViewModel {
     }
 
     private fun sanitizeSongQuery(query: String): String {
-        return query.filter { char ->
-            char.isLetterOrDigit() || char.isWhitespace() || char == '-'
+        val allowedPunctuation = setOf('-', '\'', '.', '&', '(', ')', ',', '!', '?', '"', '_', ':')
+        return buildString {
+            for (char in query) {
+                val code = char.code
+                when {
+                    char.isLetterOrDigit() -> append(char)
+                    char.isWhitespace() -> append(char)
+                    allowedPunctuation.contains(char) -> append(char)
+                    code < 32 || code == 127 -> Unit
+                }
+            }
         }
     }
 
@@ -178,7 +191,7 @@ class SongInputViewModel {
             errorMessage = null
         )
 
-        scope.launch {
+        extractionJob = scope.launch {
             try {
                 val response = YouMp3Api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
                 if (response.success && response.audioBase64 != null) {
@@ -208,20 +221,51 @@ class SongInputViewModel {
                         errorMessage = response.message
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: ApiException) {
-                state = state.copy(
-                    isExtracting = false,
-                    isExtractionFailed = true,
-                    errorMessage = e.apiMessage
-                )
+                if (isActive) {
+                    state = state.copy(
+                        isExtracting = false,
+                        isExtractionFailed = true,
+                        errorMessage = e.apiMessage
+                    )
+                }
             } catch (e: Exception) {
-                state = state.copy(
-                    isExtracting = false,
-                    isExtractionFailed = true,
-                    errorMessage = "Service unavailable. Try again later."
-                )
+                if (isActive) {
+                    state = state.copy(
+                        isExtracting = false,
+                        isExtractionFailed = true,
+                        errorMessage = "Service unavailable. Try again later."
+                    )
+                }
+            } finally {
+                extractionJob = null
             }
         }
+    }
+
+    fun onCancelExtraction() {
+        cancelExtractionIfInProgress()
+        state = state.copy(
+            isExtracting = false,
+            isExtractionFailed = false,
+            isDownloading = false,
+            isDownloadFailed = false,
+            selectedTitle = null,
+            resultTitle = null,
+            resultFormat = null,
+            resultAudioBase64 = null,
+            downloadStatus = null,
+            errorMessage = null
+        )
+    }
+
+    private fun cancelExtractionIfInProgress() {
+        if (!state.isExtracting && extractionJob == null) return
+        extractionJob?.cancel()
+        extractionJob = null
+        AudioExtractionCache.clear()
     }
 
     fun onDownloadClick() {
@@ -253,6 +297,7 @@ class SongInputViewModel {
     }
 
     fun onReturnToResults() {
+        cancelExtractionIfInProgress()
         state = state.copy(
             isExtracting = false,
             isExtractionFailed = false,
@@ -268,6 +313,7 @@ class SongInputViewModel {
     }
 
     fun onReturnToInput() {
+        cancelExtractionIfInProgress()
         state = state.copy(
             isExtracting = false,
             isExtractionFailed = false,

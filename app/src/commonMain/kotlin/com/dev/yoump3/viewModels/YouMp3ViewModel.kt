@@ -23,6 +23,8 @@ class YouMp3ViewModel {
     var state by mutableStateOf(YouMp3UiState())
         private set
 
+    val settingsViewModel = SettingsViewModel()
+
     fun onFindButtonClick() {
         state = state.copy(
             currentScreen = YouMp3Screen.SongInput,

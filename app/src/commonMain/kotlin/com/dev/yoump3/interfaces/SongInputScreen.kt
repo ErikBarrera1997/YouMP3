@@ -1,8 +1,12 @@
 package com.dev.yoump3.interfaces
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,11 +29,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.platform.LocalFocusManager
@@ -64,10 +71,19 @@ fun SongInputScreenContent(
     Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
         BackButton(
             onClick = {
-                if (state.resultTitle != null && state.searchResults.isNotEmpty()) {
-                    viewModel.onReturnToResults()
-                } else {
-                    onCloseClick()
+                when {
+                    state.isExtracting -> {
+                        viewModel.onCancelExtraction()
+                        if (state.searchResults.isNotEmpty()) {
+                            viewModel.onReturnToResults()
+                        } else {
+                            viewModel.onReturnToInput()
+                        }
+                    }
+                    state.resultTitle != null && state.searchResults.isNotEmpty() -> {
+                        viewModel.onReturnToResults()
+                    }
+                    else -> onCloseClick()
                 }
             },
             modifier = Modifier.align(Alignment.TopStart)
@@ -161,7 +177,7 @@ fun SongInputScreenContent(
                         state.errorMessage?.let { message ->
                             ResponseText(
                                 text = message,
-                                color = Color(0xFFFF5252)
+                                color = DestructiveText
                             )
                         }
 
@@ -187,13 +203,7 @@ fun SongInputScreenContent(
             }
         }
 
-            Text(
-                text = state.footer,
-                color = SecondaryText,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.End,
-                style = MaterialTheme.typography.labelMedium
-            )
+            AppFooter(footerText = state.footer)
         }
     }
 }
@@ -219,6 +229,19 @@ private fun SearchResultItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isPressed) lerp(PanelBackground, PrimaryText, 0.08f) else PanelBackground,
+        animationSpec = tween(durationMillis = 120),
+        label = "result-item-background"
+    )
+    val itemBorderColor by animateColorAsState(
+        targetValue = if (isPressed) lerp(BorderColor, PrimaryText, 0.3f) else BorderColor,
+        animationSpec = tween(durationMillis = 120),
+        label = "result-item-border"
+    )
+
     val meta = listOfNotNull(
         result.author,
         result.durationSeconds?.let { formatDuration(it) }
@@ -227,9 +250,13 @@ private fun SearchResultItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(PanelBackground)
-            .border(1.dp, BorderColor)
-            .clickable(onClick = onClick)
+            .background(backgroundColor)
+            .border(1.dp, itemBorderColor)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Text(

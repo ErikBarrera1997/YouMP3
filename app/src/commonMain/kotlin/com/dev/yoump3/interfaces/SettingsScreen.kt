@@ -22,10 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,23 +32,18 @@ import com.dev.yoump3.appVersion
 import com.dev.yoump3.generated.resources.Res
 import com.dev.yoump3.generated.resources.dark_theme
 import com.dev.yoump3.generated.resources.light_theme
+import com.dev.yoump3.viewModels.SettingsViewModel
+import com.dev.yoump3.viewModels.ThemeMode
 import org.jetbrains.compose.resources.painterResource
-
-enum class ThemeModeOption(
-    val title: String,
-    val description: String
-) {
-    DARK("Modo Oscuro", "Tema oscuro predeterminado"),
-    LIGHT("Modo Claro", "Tema claro de alto contraste")
-}
 
 @Composable
 fun SettingsScreenContent(
+    settingsViewModel: SettingsViewModel,
     onCloseClick: () -> Unit,
     footer: String = "BY CLEVER CLOUD · v$appVersion",
     modifier: Modifier = Modifier
 ) {
-    var selectedTheme by remember { mutableStateOf(ThemeModeOption.DARK) }
+    val selectedTheme = settingsViewModel.state.themeMode
 
     Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
         Column(
@@ -111,12 +102,12 @@ fun SettingsScreenContent(
                     modifier = Modifier.padding(bottom = 14.dp, start = 4.dp)
                 )
 
-                ThemeModeOption.entries.forEach { option ->
+                ThemeMode.entries.forEach { option ->
                     val isSelected = selectedTheme == option
                     ThemeOptionCard(
                         option = option,
                         isSelected = isSelected,
-                        onClick = { selectedTheme = option },
+                        onClick = { settingsViewModel.onThemeModeChange(option) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp)
@@ -133,7 +124,7 @@ fun SettingsScreenContent(
                         .padding(14.dp)
                 ) {
                     Text(
-                        text = "El modo seleccionado actualmente es: ${selectedTheme.title}. (La aplicación completa del tema se activará próximamente).",
+                        text = "El modo seleccionado actualmente es: ${selectedTheme.label}.",
                         color = SecondaryText,
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Start
@@ -141,26 +132,20 @@ fun SettingsScreenContent(
                 }
             }
 
-            Text(
-                text = footer,
-                color = SecondaryText,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.End,
-                style = MaterialTheme.typography.labelMedium
-            )
+            AppFooter(footerText = footer)
         }
     }
 }
 
 @Composable
 private fun ThemeOptionCard(
-    option: ThemeModeOption,
+    option: ThemeMode,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val borderColor = if (isSelected) PrimaryText else BorderColor
-    val imageRes = if (option == ThemeModeOption.DARK) Res.drawable.dark_theme else Res.drawable.light_theme
+    val imageRes = if (option == ThemeMode.DARK) Res.drawable.dark_theme else Res.drawable.light_theme
 
     Row(
         verticalAlignment = Alignment.CenterVertically,

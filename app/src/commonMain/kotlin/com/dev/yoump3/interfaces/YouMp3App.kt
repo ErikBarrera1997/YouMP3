@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,41 +57,60 @@ import com.dev.yoump3.viewModels.YouMp3ViewModel
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
 
-internal val AppBackground = Color(0xFF111111)
-internal val PanelBackground = Color(0xFF181818)
-internal val BorderColor = Color(0xFF2B2B2B)
-internal val PrimaryText = Color(0xFFFFFFFF)
-internal val SecondaryText = Color(0xFFAEBBD2)
-
 @Composable
 fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExit: () -> Unit = {}) {
     val songInputViewModel = remember { SongInputViewModel() }
     val errorStatusViewModel = remember { ErrorStatusViewModel() }
     var appReady by remember { mutableStateOf(false) }
     var connectionFailed by remember { mutableStateOf(false) }
+    val themeColors = viewModel.settingsViewModel.currentColors
 
-    YouMp3Theme {
-        when {
-            !appReady && !connectionFailed -> InitScreen(
-                onConnected = { appReady = true },
-                onError = { connectionFailed = true }
-            )
-            connectionFailed -> ErrorStatusScreen(
-                viewModel = errorStatusViewModel,
-                onGoBackToHome = { connectionFailed = false }
-            )
-            else -> YouMp3Screen(
-                viewModel = viewModel,
-                songInputViewModel = songInputViewModel,
-                modifier = Modifier.fillMaxSize()
-            )
+    CompositionLocalProvider(LocalAppColors provides themeColors) {
+        YouMp3Theme {
+            when {
+                !appReady && !connectionFailed -> InitScreen(
+                    onConnected = { appReady = true },
+                    onError = { connectionFailed = true }
+                )
+                connectionFailed -> ErrorStatusScreen(
+                    viewModel = errorStatusViewModel,
+                    onGoBackToHome = { connectionFailed = false }
+                )
+                else -> YouMp3Screen(
+                    viewModel = viewModel,
+                    songInputViewModel = songInputViewModel,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun YouMp3Theme(content: @Composable () -> Unit) {
+    val colors = LocalAppColors.current
     MaterialTheme(
+        colorScheme = if (colors.isDark) {
+            androidx.compose.material3.darkColorScheme(
+                primary = colors.primaryText,
+                onPrimary = colors.appBackground,
+                background = colors.appBackground,
+                onBackground = colors.primaryText,
+                surface = colors.panelBackground,
+                onSurface = colors.primaryText,
+                outline = colors.borderColor
+            )
+        } else {
+            androidx.compose.material3.lightColorScheme(
+                primary = colors.primaryText,
+                onPrimary = colors.appBackground,
+                background = colors.appBackground,
+                onBackground = colors.primaryText,
+                surface = colors.panelBackground,
+                onSurface = colors.primaryText,
+                outline = colors.borderColor
+            )
+        },
         typography = MaterialTheme.typography.copy(
             displayLarge = TextStyle(
                 fontFamily = FontFamily.SansSerif,
@@ -163,13 +183,17 @@ fun YouMp3Screen(
 
                 YouMp3Screen.SongInput -> SongInputScreenContent(
                     viewModel = songInputViewModel,
-                    onCloseClick = viewModel::onCloseSongInputClick,
+                    onCloseClick = {
+                        viewModel.onCloseSongInputClick()
+                        songInputViewModel.onCancelExtraction()
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .background(AppBackground)
                 )
 
                 YouMp3Screen.Settings -> SettingsScreenContent(
+                    settingsViewModel = viewModel.settingsViewModel,
                     onCloseClick = viewModel::onCloseSettingsClick,
                     footer = state.footer,
                     modifier = Modifier
@@ -249,13 +273,7 @@ private fun FindItScreenContent(
                 )
             }
 
-            Text(
-                text = footer,
-                color = SecondaryText,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.End,
-                style = MaterialTheme.typography.labelMedium
-            )
+            AppFooter(footerText = footer)
         }
     }
 }
@@ -361,7 +379,7 @@ private fun MusicNoteCircleButton(onClick: () -> Unit) {
                     scaleY = totalScale
                 }
                 .clip(CircleShape)
-                .background(AppBackground)
+                .background(NoteButtonBackground)
                 .border(5.dp, PrimaryText, CircleShape)
                 .clickable(
                     interactionSource = interactionSource,

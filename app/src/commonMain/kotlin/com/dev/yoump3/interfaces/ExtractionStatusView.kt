@@ -284,6 +284,50 @@ private fun ExtractionSpinner() {
 
 @Composable
 private fun ErrorGlyph() {
+    val transition = rememberInfiniteTransition(label = "error-glyph-wave")
+
+    val wave1Scale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(0)
+        ),
+        label = "error-glyph-wave-scale-1"
+    )
+    val wave1Alpha by transition.animateFloat(
+        initialValue = 0.30f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(0)
+        ),
+        label = "error-glyph-wave-alpha-1"
+    )
+
+    val wave2Scale by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(900)
+        ),
+        label = "error-glyph-wave-scale-2"
+    )
+    val wave2Alpha by transition.animateFloat(
+        initialValue = 0.22f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Restart,
+            initialStartOffset = StartOffset(900)
+        ),
+        label = "error-glyph-wave-alpha-2"
+    )
+
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(SpinnerMaxSize)
@@ -291,19 +335,36 @@ private fun ErrorGlyph() {
         Box(
             modifier = Modifier
                 .size(SpinnerRingSize)
-                .border(1.5.dp, WarningColor.copy(alpha = 0.35f), CircleShape)
+                .graphicsLayer {
+                    scaleX = wave2Scale
+                    scaleY = wave2Scale
+                    alpha = wave2Alpha
+                }
+                .border(1.5.dp, WarningColor.copy(alpha = 0.4f), CircleShape)
         )
         Box(
             modifier = Modifier
                 .size(SpinnerRingSize)
-                .border(1.5.dp, WarningColor.copy(alpha = 0.2f), CircleShape)
+                .graphicsLayer {
+                    scaleX = wave1Scale
+                    scaleY = wave1Scale
+                    alpha = wave1Alpha
+                }
+                .border(1.5.dp, WarningColor.copy(alpha = 0.6f), CircleShape)
         )
-        Icon(
-            imageVector = ErrorIcon,
-            contentDescription = null,
-            tint = Color.Unspecified,
-            modifier = Modifier.size(54.dp)
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(SpinnerRingSize)
+                .border(1.5.dp, WarningColor.copy(alpha = 0.45f), CircleShape)
+        ) {
+            Icon(
+                imageVector = ErrorIcon,
+                contentDescription = null,
+                tint = Color.Unspecified,
+                modifier = Modifier.size(54.dp)
+            )
+        }
     }
 }
 
