@@ -37,7 +37,7 @@ private val WaveRingSize = 120.dp
 private val WaveMaxSize = WaveRingSize * 1.75f
 
 @Composable
-fun InitScreen(onConnected: () -> Unit, onError: () -> Unit) {
+fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -72,7 +72,7 @@ fun InitScreen(onConnected: () -> Unit, onError: () -> Unit) {
         )
 
         LaunchedEffect(Unit) {
-            val result = YouMp3Api.checkConnection()
+            val result = api.checkConnection()
             if (result.isSuccess) {
                 onConnected()
             } else {

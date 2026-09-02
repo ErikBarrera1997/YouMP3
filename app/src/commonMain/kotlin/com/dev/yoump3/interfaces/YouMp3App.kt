@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.dependencies.PlatformDependencies
 import com.dev.yoump3.generated.resources.Res
 import com.dev.yoump3.generated.resources.icon
 import com.dev.yoump3.init.InitScreen
@@ -58,9 +60,13 @@ import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
 
 @Composable
-fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExit: () -> Unit = {}) {
-    val songInputViewModel = remember { SongInputViewModel() }
-    val errorStatusViewModel = remember { ErrorStatusViewModel() }
+fun YouMp3App(
+    dependencies: PlatformDependencies,
+    viewModel: YouMp3ViewModel,
+    onExit: () -> Unit = {}
+) {
+    val songInputViewModel = viewModel { SongInputViewModel(dependencies.api, dependencies.audioSaver) }
+    val errorStatusViewModel = viewModel<ErrorStatusViewModel>()
     var appReady by remember { mutableStateOf(false) }
     var connectionFailed by remember { mutableStateOf(false) }
     val themeColors = viewModel.settingsViewModel.currentColors
@@ -69,6 +75,7 @@ fun YouMp3App(viewModel: YouMp3ViewModel = remember { YouMp3ViewModel() }, onExi
         YouMp3Theme {
             when {
                 !appReady && !connectionFailed -> InitScreen(
+                    api = dependencies.api,
                     onConnected = { appReady = true },
                     onError = { connectionFailed = true }
                 )

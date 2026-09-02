@@ -1,6 +1,5 @@
 package com.dev.yoump3.init
 
-import com.dev.yoump3.conection.YouMp3ApiConfig
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.plugins.*
@@ -9,6 +8,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -48,7 +48,9 @@ private data class ErrorApiResponse(val message: String? = null)
 
 class ApiException(val apiMessage: String) : Exception(apiMessage)
 
-object YouMp3Api {
+class YouMp3Api(
+    private val baseUrl: String
+) {
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
@@ -60,12 +62,17 @@ object YouMp3Api {
         }
     }
 
-    suspend fun checkConnection(): Result<Unit> = runCatching {
-        client.get(YouMp3ApiConfig.baseUrl)
+    suspend fun checkConnection(): Result<Unit> = try {
+        client.get(baseUrl)
+        Result.success(Unit)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     suspend fun searchSongs(videoName: String): AudioSearchResponse {
-        val response = client.post("${YouMp3ApiConfig.baseUrl}/api/audios/search") {
+        val response = client.post("$baseUrl/api/audios/search") {
             contentType(ContentType.Application.Json)
             setBody(AudioSearchRequest(videoName))
         }
@@ -74,7 +81,7 @@ object YouMp3Api {
     }
 
     suspend fun extractAudio(videoName: String, videoId: String? = null): AudioExtractionResponse {
-        val response = client.post("${YouMp3ApiConfig.baseUrl}/api/audios/extract") {
+        val response = client.post("$baseUrl/api/audios/extract") {
             contentType(ContentType.Application.Json)
             setBody(AudioExtractionRequest(videoName, videoId))
         }

@@ -24,6 +24,7 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation(compose.components.resources)
+                implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
                 implementation("io.ktor:ktor-client-core:3.0.3")
                 implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
@@ -54,6 +55,22 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+val youMp3Version: String = providers.gradleProperty("YouMp3Version").get()
+val youMp3VersionCode: Int = youMp3Version
+    .split('.')
+    .take(3)
+    .mapIndexed { index, part -> (part.toIntOrNull() ?: 0) * listOf(10000, 100, 1)[index] }
+    .sum()
+
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) {
+        f.inputStream().use { load(it) }
+    }
+}
+val serverBaseUrl: String =
+    localProperties.getProperty("yoump3.serverUrl") ?: "http://192.168.1.9:8088"
+
 android {
     namespace = "com.dev.yoump3"
     compileSdk = 36
@@ -62,10 +79,12 @@ android {
         applicationId = "com.dev.yoump3"
         minSdk = 24
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.9.5"
+        versionCode = youMp3VersionCode
+        versionName = youMp3Version
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "SERVER_BASE_URL", "\"$serverBaseUrl\"")
     }
 
     signingConfigs {
@@ -82,7 +101,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
@@ -108,7 +128,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi)
             packageName = "YouMp3"
-            packageVersion = "1.9.3"
+            packageVersion = youMp3Version
         }
     }
 }
@@ -124,3 +144,23 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
 }
+
+val generateDesktopAppVersion = tasks.register("generateDesktopAppVersion") {
+    val outputDir = layout.buildDirectory.dir("generated/desktopAppVersion")
+    val version = youMp3Version
+    inputs.property("version", version)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("com/dev/yoump3/AppVersion.desktop.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            |package com.dev.yoump3
+            |
+            |actual val appVersion: String = "$version"
+            |""".trimMargin()
+        )
+    }
+}
+
+kotlin.sourceSets.getByName("desktopMain").kotlin.srcDir(generateDesktopAppVersion)

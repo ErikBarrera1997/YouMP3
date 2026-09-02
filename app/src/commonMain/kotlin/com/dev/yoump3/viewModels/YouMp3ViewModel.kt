@@ -3,7 +3,9 @@ package com.dev.yoump3.viewModels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 import com.dev.yoump3.appVersion
+import com.dev.yoump3.preferences.ThemeStore
 
 enum class YouMp3Screen {
     Home,
@@ -19,11 +21,13 @@ data class YouMp3UiState(
     val findButtonPresses: Int = 0
 )
 
-class YouMp3ViewModel {
+class YouMp3ViewModel(
+    themeStore: ThemeStore
+) : ViewModel() {
     var state by mutableStateOf(YouMp3UiState())
         private set
 
-    val settingsViewModel = SettingsViewModel()
+    val settingsViewModel = SettingsViewModel(themeStore)
 
     fun onFindButtonClick() {
         state = state.copy(

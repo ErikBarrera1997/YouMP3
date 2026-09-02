@@ -145,6 +145,7 @@ fun SongInputScreenContent(
                                 onValueChange = viewModel::onSongQueryChange,
                                 onSearchClick = submitSearch,
                                 searchEnabled = !state.isLoading && state.songQuery.isNotBlank(),
+                                enabled = !state.isLoading,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(Modifier.height(40.dp))
@@ -309,12 +310,14 @@ private fun SongInputBox(
     onValueChange: (String) -> Unit,
     onSearchClick: () -> Unit,
     searchEnabled: Boolean,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
         singleLine = true,
+        enabled = enabled,
         cursorBrush = SolidColor(PrimaryText),
         textStyle = MaterialTheme.typography.titleLarge.merge(
             TextStyle(color = PrimaryText)
@@ -351,7 +354,7 @@ private fun SongInputBox(
                         tint = if (searchEnabled) PrimaryText else SecondaryText,
                         modifier = Modifier
                             .size(26.dp)
-                            .clickable(onClick = onSearchClick)
+                            .clickable(enabled = enabled && searchEnabled, onClick = onSearchClick)
                     )
                 }
             }
@@ -375,7 +378,7 @@ private fun SearchActionButton(
             .clip(CircleShape)
             .background(AppBackground)
             .border(2.dp, borderColor, CircleShape)
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 24.dp)
     ) {
         Text(
