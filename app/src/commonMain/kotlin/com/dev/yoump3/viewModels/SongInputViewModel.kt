@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.dev.yoump3.appVersion
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
+import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -44,7 +45,8 @@ data class SongInputUiState(
 
 class SongInputViewModel(
     private val api: YouMp3Api,
-    private val audioSaver: AudioSaver
+    private val audioSaver: AudioSaver,
+    val audioPlayer: AudioPlayer
 ) : ViewModel() {
     var state by mutableStateOf(SongInputUiState())
         private set
@@ -52,8 +54,14 @@ class SongInputViewModel(
     private var searchJob: Job? = null
     private var extractionJob: Job? = null
 
+    override fun onCleared() {
+        audioPlayer.release()
+        super.onCleared()
+    }
+
     fun onSongQueryChange(value: String) {
         val sanitized = sanitizeSongQuery(value)
+        audioPlayer.stop()
         state = state.copy(
             songQuery = sanitized,
             searchResults = emptyList(),
@@ -68,17 +76,8 @@ class SongInputViewModel(
     }
 
     private fun sanitizeSongQuery(query: String): String {
-        val allowedPunctuation = setOf('-', '\'', '.', '&', '(', ')', ',', '!', '?', '"', '_', ':')
-        return buildString {
-            for (char in query) {
-                val code = char.code
-                when {
-                    char.isLetterOrDigit() -> append(char)
-                    char.isWhitespace() -> append(char)
-                    allowedPunctuation.contains(char) -> append(char)
-                    code < 32 || code == 127 -> Unit
-                }
-            }
+        return query.filter { char ->
+            char.isLetter() || char.isDigit() || char == ' ' || char == '-' || char == ','
         }
     }
 
@@ -86,6 +85,7 @@ class SongInputViewModel(
         val query = state.songQuery.trim()
         if (query.isEmpty()) return
 
+        audioPlayer.stop()
         state = state.copy(
             lastSearchQuery = query,
             searchRequests = state.searchRequests + 1,
@@ -169,6 +169,7 @@ class SongInputViewModel(
                     val resolvedFormat = resolveFormat(response.contentType, response.fileName)
                     val audioBase64 = response.audioBase64
 
+                    audioPlayer.load(audioBase64)
                     state = state.copy(
                         isExtracting = false,
                         resultTitle = resolvedTitle,
@@ -208,6 +209,7 @@ class SongInputViewModel(
 
     fun onCancelExtraction() {
         cancelInFlightRequests()
+        audioPlayer.stop()
         state = state.copy(
             isExtracting = false,
             isExtractionFailed = false,
@@ -244,10 +246,10 @@ class SongInputViewModel(
         viewModelScope.launch {
             try {
                 val path = audioSaver.save(fileName, "audio/mpeg", base64)
+                audioPlayer.stop()
                 state = state.copy(
                     isDownloading = false,
-                    downloadStatus = "Descargado en: $path",
-                    resultAudioBase64 = null
+                    downloadStatus = "Descargado en: $path"
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -263,6 +265,7 @@ class SongInputViewModel(
 
     fun onReturnToResults() {
         cancelInFlightRequests()
+        audioPlayer.stop()
         state = state.copy(
             isExtracting = false,
             isExtractionFailed = false,
@@ -279,6 +282,7 @@ class SongInputViewModel(
 
     fun onReturnToInput() {
         cancelInFlightRequests()
+        audioPlayer.stop()
         state = state.copy(
             isExtracting = false,
             isExtractionFailed = false,

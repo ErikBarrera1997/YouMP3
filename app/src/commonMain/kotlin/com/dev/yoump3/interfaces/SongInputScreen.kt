@@ -111,10 +111,9 @@ fun SongInputScreenContent(
                     .padding(top = 54.dp)
             ) {
                 when {
-                    state.isExtracting || state.isDownloading ||
-                        state.isDownloadFailed || state.isExtractionFailed -> {
+                    state.isExtracting || state.isExtractionFailed -> {
                         ExtractionStatusView(
-                            isFailed = state.isDownloadFailed || state.isExtractionFailed,
+                            isFailed = state.isExtractionFailed,
                             title = state.selectedTitle ?: state.resultTitle,
                             message = state.errorMessage,
                             onReturnToInput = {
@@ -124,11 +123,7 @@ fun SongInputScreenContent(
                                     viewModel.onReturnToInput()
                                 }
                             },
-                            onRetryDownload = if (state.isDownloadFailed) {
-                                viewModel::onDownloadClick
-                            } else {
-                                null
-                            }
+                            onRetryDownload = null
                         )
                     }
 
@@ -160,48 +155,52 @@ fun SongInputScreenContent(
                                 modifier = Modifier.padding(top = 8.dp)
                             )
                         } else {
-                        if (state.searchResults.isNotEmpty() && state.resultTitle == null) {
-                            ResponseText(
-                                text = "MEJORES RESULTADOS",
-                                color = PrimaryText
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            state.searchResults.forEach { result ->
-                                SearchResultItem(
-                                    result = result,
-                                    onClick = { viewModel.onSelectResult(result.videoId, result.title) }
-                                )
-                                Spacer(Modifier.height(8.dp))
-                            }
-                        }
-
-                        state.errorMessage?.let { message ->
-                            ResponseText(
-                                text = message,
-                                color = DestructiveText
-                            )
-                        }
-
-                        state.resultTitle?.let { title ->
-                            ResponseText(text = title)
-                            ResponseText(text = "Formato: ${state.resultFormat ?: "MP3"}")
-
-                            DownloadLink(
-                                text = if (state.isDownloading) "Descargando..." else "Descargar",
-                                enabled = !state.isDownloading,
-                                onClick = viewModel::onDownloadClick
-                            )
-
-                            state.downloadStatus?.let { status ->
+                            if (state.searchResults.isNotEmpty() && state.resultTitle == null) {
                                 ResponseText(
-                                    text = status,
+                                    text = "MEJORES RESULTADOS",
                                     color = PrimaryText
                                 )
+                                Spacer(Modifier.height(8.dp))
+                                state.searchResults.forEach { result ->
+                                    SearchResultItem(
+                                        result = result,
+                                        onClick = { viewModel.onSelectResult(result.videoId, result.title) }
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                            }
+
+                            state.errorMessage?.let { message ->
+                                if (state.resultTitle == null) {
+                                    ResponseText(
+                                        text = message,
+                                        color = DestructiveText
+                                    )
+                                }
+                            }
+
+                            state.resultTitle?.let { title ->
+                                Spacer(Modifier.height(16.dp))
+                                ExtractionResultCard(
+                                    title = title,
+                                    format = state.resultFormat ?: "MP3",
+                                    isDownloading = state.isDownloading,
+                                    downloadStatus = state.downloadStatus,
+                                    isDownloadFailed = state.isDownloadFailed,
+                                    errorMessage = if (state.isDownloadFailed) state.errorMessage else null,
+                                    onDownloadClick = viewModel::onDownloadClick
+                                )
+                                if (state.resultAudioBase64 != null) {
+                                    Spacer(Modifier.height(12.dp))
+                                    MiniPlayer(
+                                        audioPlayer = viewModel.audioPlayer,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
         }
 
             AppFooter(footerText = state.footer)
@@ -304,6 +303,79 @@ private fun BackButton(
 }
 
 @Composable
+private fun ExtractionResultCard(
+    title: String,
+    format: String,
+    isDownloading: Boolean,
+    downloadStatus: String?,
+    isDownloadFailed: Boolean,
+    errorMessage: String?,
+    onDownloadClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(PanelBackground, RoundedCornerShape(10.dp))
+            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 20.dp, vertical = 26.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = title,
+                color = PrimaryText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleLarge
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                text = "Formato: $format",
+                color = SecondaryText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            DownloadLink(
+                text = if (isDownloading) "Descargando..." else "Descargar",
+                enabled = !isDownloading,
+                onClick = onDownloadClick
+            )
+
+            if (isDownloadFailed && errorMessage != null) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = errorMessage,
+                    color = DestructiveText,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            downloadStatus?.let { status ->
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = status,
+                    color = PrimaryText,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SongInputBox(
     value: String,
     placeholder: String,
@@ -315,7 +387,12 @@ private fun SongInputBox(
 ) {
     BasicTextField(
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = { newText ->
+            val sanitized = newText.filter { char ->
+                char.isLetter() || char.isDigit() || char == ' ' || char == '-' || char == ','
+            }
+            onValueChange(sanitized)
+        },
         singleLine = true,
         enabled = enabled,
         cursorBrush = SolidColor(PrimaryText),
@@ -348,14 +425,27 @@ private fun SongInputBox(
                         innerTextField()
                     }
                     Spacer(Modifier.size(14.dp))
-                    Icon(
-                        imageVector = SearchIcon,
-                        contentDescription = "Search",
-                        tint = if (searchEnabled) PrimaryText else SecondaryText,
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clickable(enabled = enabled && searchEnabled, onClick = onSearchClick)
-                    )
+                    if (value.isNotEmpty()) {
+                        Icon(
+                            imageVector = ClearIcon,
+                            contentDescription = "Borrar",
+                            tint = PrimaryText,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clickable(enabled = enabled) {
+                                    onValueChange("")
+                                }
+                        )
+                    } else {
+                        Icon(
+                            imageVector = SearchIcon,
+                            contentDescription = "Search",
+                            tint = if (searchEnabled) PrimaryText else SecondaryText,
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clickable(enabled = enabled && searchEnabled, onClick = onSearchClick)
+                        )
+                    }
                 }
             }
         }
@@ -368,6 +458,13 @@ private fun SearchActionButton(
     enabled: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isPressed && enabled) lerp(AppBackground, PrimaryText, 0.25f) else AppBackground,
+        animationSpec = tween(durationMillis = 120),
+        label = "search-button-background"
+    )
     val textColor = if (enabled) PrimaryText else SecondaryText
     val borderColor = if (enabled) PrimaryText else BorderColor
 
@@ -376,9 +473,14 @@ private fun SearchActionButton(
         modifier = modifier
             .height(56.dp)
             .clip(CircleShape)
-            .background(AppBackground)
+            .background(backgroundColor)
             .border(2.dp, borderColor, CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clickable(
+                enabled = enabled,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
             .padding(horizontal = 24.dp)
     ) {
         Text(
@@ -389,6 +491,30 @@ private fun SearchActionButton(
         )
     }
 }
+
+private val ClearIcon = ImageVector.Builder(
+    name = "Clear",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).apply {
+    path(fill = SolidColor(Color.White)) {
+        moveTo(19f, 6.41f)
+        lineTo(17.59f, 5f)
+        lineTo(12f, 10.59f)
+        lineTo(6.41f, 5f)
+        lineTo(5f, 6.41f)
+        lineTo(10.59f, 12f)
+        lineTo(5f, 17.59f)
+        lineTo(6.41f, 19f)
+        lineTo(12f, 13.41f)
+        lineTo(17.59f, 19f)
+        lineTo(19f, 17.59f)
+        lineTo(13.41f, 12f)
+        close()
+    }
+}.build()
 
 private val SearchIcon = ImageVector.Builder(
     name = "Search",

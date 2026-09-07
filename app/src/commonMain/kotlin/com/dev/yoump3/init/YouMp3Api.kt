@@ -56,7 +56,7 @@ class YouMp3Api(
             json(Json { ignoreUnknownKeys = true })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 200000
+            requestTimeoutMillis = 20000
             connectTimeoutMillis = 20000
             socketTimeoutMillis = 200000
         }

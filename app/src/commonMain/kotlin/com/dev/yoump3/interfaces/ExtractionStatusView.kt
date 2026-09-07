@@ -25,6 +25,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,8 +41,8 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.services.AudioPlayer
 
-private val WarningColor = Color(0xFFFFB4AB)
 private val ButtonOnColor = Color(0xFF111111)
 private val SpinnerRingSize = 72.dp
 private val SpinnerMaxSize = 96.dp
@@ -52,7 +54,7 @@ private val ErrorIcon = ImageVector.Builder(
     viewportWidth = 24f,
     viewportHeight = 24f
 ).apply {
-    path(fill = SolidColor(WarningColor)) {
+    path(fill = SolidColor(Color.White)) {
         moveTo(12f, 2f)
         curveTo(6.48f, 2f, 2f, 6.48f, 2f, 12f)
         curveTo(2f, 17.52f, 6.48f, 22f, 12f, 22f)
@@ -118,6 +120,42 @@ private val BackIcon = ImageVector.Builder(
     }
 }.build()
 
+private val PlayIcon = ImageVector.Builder(
+    name = "Play",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).apply {
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(8f, 5f)
+        lineTo(19f, 12f)
+        lineTo(8f, 19f)
+        close()
+    }
+}.build()
+
+private val PauseIcon = ImageVector.Builder(
+    name = "Pause",
+    defaultWidth = 24.dp,
+    defaultHeight = 24.dp,
+    viewportWidth = 24f,
+    viewportHeight = 24f
+).apply {
+    path(fill = SolidColor(Color.Black)) {
+        moveTo(6f, 5f)
+        horizontalLineTo(10f)
+        verticalLineTo(19f)
+        horizontalLineTo(6f)
+        close()
+        moveTo(14f, 5f)
+        horizontalLineTo(18f)
+        verticalLineTo(19f)
+        horizontalLineTo(14f)
+        close()
+    }
+}.build()
+
 @Composable
 fun ExtractionStatusView(
     isFailed: Boolean,
@@ -147,8 +185,8 @@ fun ExtractionStatusView(
             Spacer(Modifier.height(18.dp))
 
             Text(
-                text = "EXTRAYENDO",
-                color = if (isFailed) WarningColor else PrimaryText,
+                text = "EXTRAYENDO....",
+                color = if (isFailed) DestructiveText else PrimaryText,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.fillMaxWidth()
@@ -170,7 +208,7 @@ fun ExtractionStatusView(
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = it,
-                        color = WarningColor,
+                        color = DestructiveText,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.fillMaxWidth()
@@ -200,6 +238,66 @@ fun ExtractionStatusView(
                 icon = BackIcon,
                 onClick = onReturnToInput,
                 modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+fun MiniPlayer(
+    audioPlayer: AudioPlayer,
+    modifier: Modifier = Modifier
+) {
+    val state = audioPlayer.state
+    val durationMs = state.durationMs
+    val hasAudio = durationMs > 0L
+
+    val sliderValue = if (hasAudio) {
+        state.positionMs.coerceIn(0L, durationMs).toFloat()
+    } else {
+        0f
+    }
+    val sliderRange = if (hasAudio) 0f..durationMs.toFloat() else 0f..1f
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(PanelBackground, RoundedCornerShape(10.dp))
+            .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(PrimaryText)
+                    .clickable(onClick = audioPlayer::toggle)
+            ) {
+                Icon(
+                    imageVector = if (state.isPlaying) PauseIcon else PlayIcon,
+                    contentDescription = null,
+                    tint = PanelBackground,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Slider(
+                value = sliderValue,
+                onValueChange = { audioPlayer.seekTo(it.toLong()) },
+                valueRange = sliderRange,
+                colors = SliderDefaults.colors(
+                    thumbColor = AccentText,
+                    activeTrackColor = AccentText,
+                    inactiveTrackColor = BorderColor
+                ),
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -328,6 +426,7 @@ private fun ErrorGlyph() {
         label = "error-glyph-wave-alpha-2"
     )
 
+    val errorColor = DestructiveText
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.size(SpinnerMaxSize)
@@ -340,7 +439,7 @@ private fun ErrorGlyph() {
                     scaleY = wave2Scale
                     alpha = wave2Alpha
                 }
-                .border(1.5.dp, WarningColor.copy(alpha = 0.4f), CircleShape)
+                .border(1.5.dp, errorColor.copy(alpha = 0.4f), CircleShape)
         )
         Box(
             modifier = Modifier
@@ -350,18 +449,18 @@ private fun ErrorGlyph() {
                     scaleY = wave1Scale
                     alpha = wave1Alpha
                 }
-                .border(1.5.dp, WarningColor.copy(alpha = 0.6f), CircleShape)
+                .border(1.5.dp, errorColor.copy(alpha = 0.6f), CircleShape)
         )
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .size(SpinnerRingSize)
-                .border(1.5.dp, WarningColor.copy(alpha = 0.45f), CircleShape)
+                .border(1.5.dp, errorColor.copy(alpha = 0.45f), CircleShape)
         ) {
             Icon(
                 imageVector = ErrorIcon,
                 contentDescription = null,
-                tint = Color.Unspecified,
+                tint = errorColor,
                 modifier = Modifier.size(54.dp)
             )
         }

@@ -65,7 +65,7 @@ fun YouMp3App(
     viewModel: YouMp3ViewModel,
     onExit: () -> Unit = {}
 ) {
-    val songInputViewModel = viewModel { SongInputViewModel(dependencies.api, dependencies.audioSaver) }
+    val songInputViewModel = viewModel { SongInputViewModel(dependencies.api, dependencies.audioSaver, dependencies.audioPlayer) }
     val errorStatusViewModel = viewModel<ErrorStatusViewModel>()
     var appReady by remember { mutableStateOf(false) }
     var connectionFailed by remember { mutableStateOf(false) }
@@ -160,11 +160,14 @@ fun YouMp3Screen(
 ) {
     val state = viewModel.state
 
-    Surface(
-        color = AppBackground,
-        contentColor = PrimaryText,
-        modifier = modifier
+    Box(
+        modifier = modifier.fillMaxSize()
     ) {
+        SonicCascadeBackground(
+            isDark = AppTheme.colors.isDark,
+            modifier = Modifier.fillMaxSize()
+        )
+
         AnimatedContent(
             targetState = state.currentScreen,
             transitionSpec = {
@@ -183,9 +186,7 @@ fun YouMp3Screen(
                     footer = state.footer,
                     onFindClick = viewModel::onFindButtonClick,
                     onSettingsClick = viewModel::onSettingsClick,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AppBackground)
+                    modifier = Modifier.fillMaxSize()
                 )
 
                 YouMp3Screen.SongInput -> SongInputScreenContent(
@@ -194,18 +195,14 @@ fun YouMp3Screen(
                         viewModel.onCloseSongInputClick()
                         songInputViewModel.onCancelExtraction()
                     },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AppBackground)
+                    modifier = Modifier.fillMaxSize()
                 )
 
                 YouMp3Screen.Settings -> SettingsScreenContent(
                     settingsViewModel = viewModel.settingsViewModel,
                     onCloseClick = viewModel::onCloseSettingsClick,
                     footer = state.footer,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(AppBackground)
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -230,15 +227,12 @@ private fun FindItScreenContent(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(PanelBackground)
-                    .border(1.dp, BorderColor)
-                    .padding(vertical = 18.dp)
+                    .padding(vertical = 12.dp)
             ) {
                 SettingsButton(
                     onClick = onSettingsClick,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 14.dp)
                 )
 
                 Column(
@@ -252,13 +246,13 @@ private fun FindItScreenContent(
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.displayLarge
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
                     Text(
                         text = title,
                         color = SecondaryText,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelMedium
+                        style = MaterialTheme.typography.titleLarge
                     )
                 }
             }
@@ -293,7 +287,7 @@ private fun SettingsButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .size(42.dp)
+            .size(52.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick)
     ) {
@@ -301,7 +295,7 @@ private fun SettingsButton(
             imageVector = SettingsIcon,
             contentDescription = "Ajustes",
             tint = PrimaryText,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(30.dp)
         )
     }
 }

@@ -96,7 +96,7 @@ fun SettingsScreenContent(
                     .padding(top = 36.dp, bottom = 24.dp)
             ) {
                 Text(
-                    text = "TEMA DE LA APLICACIÓN",
+                    text = "TEMA",
                     color = SecondaryText,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(bottom = 14.dp, start = 4.dp)
@@ -115,21 +115,6 @@ fun SettingsScreenContent(
                 }
 
                 Spacer(Modifier.height(8.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(PanelBackground)
-                        .border(1.dp, BorderColor, RoundedCornerShape(8.dp))
-                        .padding(14.dp)
-                ) {
-                    Text(
-                        text = "El modo seleccionado actualmente es: ${selectedTheme.label}.",
-                        color = SecondaryText,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Start
-                    )
-                }
             }
 
             AppFooter(footerText = footer)
@@ -166,7 +151,7 @@ private fun ThemeOptionCard(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(AppBackground)
+                    .background(NoteButtonBackground)
                     .border(1.dp, if (isSelected) PrimaryText else BorderColor, CircleShape)
                     .padding(8.dp)
             ) {

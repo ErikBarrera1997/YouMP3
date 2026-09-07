@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dev.yoump3.interfaces.AppBackground
+import com.dev.yoump3.interfaces.AppFooter
 import com.dev.yoump3.interfaces.PrimaryText
 import com.dev.yoump3.interfaces.SecondaryText
 
@@ -70,6 +71,14 @@ fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: () -> Unit) {
                 .align(Alignment.Center)
                 .offset(y = WaveMaxSize / 2 + 16.dp)
         )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(horizontal = 28.dp, vertical = 34.dp)
+        ) {
+            AppFooter()
+        }
 
         LaunchedEffect(Unit) {
             val result = api.checkConnection()
