@@ -1,10 +1,16 @@
 package com.dev.yoump3.interfaces
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -39,14 +45,20 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.LaunchedEffect
+import com.dev.yoump3.generated.resources.Res
+import com.dev.yoump3.generated.resources.retry
 import com.dev.yoump3.viewModels.SearchResultUi
 import com.dev.yoump3.viewModels.SongInputViewModel
+import kotlin.math.roundToLong
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun SongInputScreenContent(
@@ -55,6 +67,7 @@ fun SongInputScreenContent(
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.state
+    val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val hideKeyboard = {
@@ -68,7 +81,15 @@ fun SongInputScreenContent(
         }
     }
 
-    Box(modifier = modifier.padding(horizontal = 28.dp, vertical = 34.dp)) {
+    Box(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    hideKeyboard()
+                }
+            }
+            .padding(horizontal = 28.dp, vertical = 34.dp)
+    ) {
         BackButton(
             onClick = {
                 when {
@@ -107,99 +128,136 @@ fun SongInputScreenContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(top = 54.dp)
             ) {
-                when {
-                    state.isExtracting || state.isExtractionFailed -> {
-                        ExtractionStatusView(
-                            isFailed = state.isExtractionFailed,
-                            title = state.selectedTitle ?: state.resultTitle,
-                            message = state.errorMessage,
-                            onReturnToInput = {
-                                if (state.searchResults.isNotEmpty()) {
-                                    viewModel.onReturnToResults()
-                                } else {
-                                    viewModel.onReturnToInput()
-                                }
-                            },
-                            onRetryDownload = null
+                val isExtractionView = state.isExtracting || state.isExtractionFailed
+                val resultsVisible = !isExtractionView && !state.isLoading
+
+                LaunchedEffect(scrollState.value) {
+                    if (resultsVisible) {
+                        viewModel.resultsScrollOffset = scrollState.value
+                    }
+                }
+
+                LaunchedEffect(resultsVisible) {
+                    if (resultsVisible) {
+                        scrollState.scrollTo(viewModel.resultsScrollOffset)
+                    }
+                }
+
+                if (!isExtractionView) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 18.dp)
+                    ) {
+                        SongInputBox(
+                            value = state.songQuery,
+                            placeholder = state.placeholder,
+                            onValueChange = viewModel::onSongQueryChange,
+                            onSearchClick = submitSearch,
+                            searchEnabled = !state.isLoading && state.songQuery.isNotBlank(),
+                            enabled = !state.isLoading,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(40.dp))
+                        SearchActionButton(
+                            onClick = submitSearch,
+                            enabled = !state.isLoading && state.songQuery.isNotBlank()
                         )
                     }
+                }
 
-                    else -> {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 18.dp)
-                        ) {
-                            SongInputBox(
-                                value = state.songQuery,
-                                placeholder = state.placeholder,
-                                onValueChange = viewModel::onSongQueryChange,
-                                onSearchClick = submitSearch,
-                                searchEnabled = !state.isLoading && state.songQuery.isNotBlank(),
-                                enabled = !state.isLoading,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(40.dp))
-                            SearchActionButton(
-                                onClick = submitSearch,
-                                enabled = !state.isLoading && state.songQuery.isNotBlank()
-                            )
-                        }
+                AnimatedVisibility(
+                    visible = !isExtractionView && state.isLoading,
+                    enter = fadeIn(tween(240)),
+                    exit = fadeOut(tween(180)),
+                    label = "search-loading-status"
+                ) {
+                    SearchStatusView(
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
 
-                        if (state.isLoading) {
-                            SearchStatusView(
-                                modifier = Modifier.padding(top = 8.dp)
+                AnimatedVisibility(
+                    visible = !isExtractionView && !state.isLoading,
+                    enter = fadeIn(tween(260)) + expandVertically(animationSpec = tween(260)),
+                    exit = fadeOut(tween(220)) + shrinkVertically(animationSpec = tween(220)),
+                    label = "results-and-extra-result-area"
+                ) {
+                    Column {
+                        if (state.searchResults.isNotEmpty() && state.resultTitle == null) {
+                            ResponseText(
+                                text = "MEJORES RESULTADOS",
+                                color = PrimaryText
                             )
-                        } else {
-                            if (state.searchResults.isNotEmpty() && state.resultTitle == null) {
-                                ResponseText(
-                                    text = "MEJORES RESULTADOS",
-                                    color = PrimaryText
+                            Spacer(Modifier.height(8.dp))
+                            state.searchResults.forEach { result ->
+                                SearchResultItem(
+                                    result = result,
+                                    onClick = { viewModel.onSelectResult(result.videoId, result.title) }
                                 )
                                 Spacer(Modifier.height(8.dp))
-                                state.searchResults.forEach { result ->
-                                    SearchResultItem(
-                                        result = result,
-                                        onClick = { viewModel.onSelectResult(result.videoId, result.title) }
-                                    )
-                                    Spacer(Modifier.height(8.dp))
-                                }
                             }
+                        }
 
-                            state.errorMessage?.let { message ->
-                                if (state.resultTitle == null) {
-                                    ResponseText(
-                                        text = message,
-                                        color = DestructiveText
-                                    )
-                                }
-                            }
-
-                            state.resultTitle?.let { title ->
-                                Spacer(Modifier.height(16.dp))
-                                ExtractionResultCard(
-                                    title = title,
-                                    format = state.resultFormat ?: "MP3",
-                                    isDownloading = state.isDownloading,
-                                    downloadStatus = state.downloadStatus,
-                                    isDownloadFailed = state.isDownloadFailed,
-                                    errorMessage = if (state.isDownloadFailed) state.errorMessage else null,
-                                    onDownloadClick = viewModel::onDownloadClick
+                        state.errorMessage?.let { message ->
+                            if (state.resultTitle == null) {
+                                ResponseText(
+                                    text = message,
+                                    color = DestructiveText
                                 )
-                                if (state.resultAudioBase64 != null) {
-                                    Spacer(Modifier.height(12.dp))
-                                    MiniPlayer(
-                                        audioPlayer = viewModel.audioPlayer,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
+                                Spacer(Modifier.height(18.dp))
+                                StatusActionButton(
+                                    text = "REINTENTAR BÚSQUEDA",
+                                    filled = true,
+                                    iconPainter = painterResource(Res.drawable.retry),
+                                    onClick = viewModel::onRetrySearch,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        state.resultTitle?.let { title ->
+                            Spacer(Modifier.height(16.dp))
+                            ExtractionResultCard(
+                                title = title,
+                                format = state.resultFormat ?: "MP3",
+                                sizeBytes = state.resultSizeBytes,
+                                isDownloading = state.isDownloading,
+                                downloadStatus = state.downloadStatus,
+                                isDownloadFailed = state.isDownloadFailed,
+                                errorMessage = if (state.isDownloadFailed) state.errorMessage else null,
+                                onDownloadClick = viewModel::onDownloadClick
+                            )
+                            if (state.resultAudioBase64 != null) {
+                                Spacer(Modifier.height(12.dp))
+                                MiniPlayer(
+                                    audioPlayer = viewModel.audioPlayer,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                     }
+                }
+
+                if (isExtractionView) {
+                    ExtractionStatusView(
+                        isFailed = state.isExtractionFailed,
+                        title = state.selectedTitle ?: state.resultTitle,
+                        message = state.errorMessage,
+                        onReturnToInput = {
+                            if (state.searchResults.isNotEmpty()) {
+                                viewModel.onReturnToResults()
+                            } else {
+                                viewModel.onReturnToInput()
+                            }
+                        },
+                        onRetryDownload = null,
+                        onRetrySearch = viewModel::onRetrySearch
+                    )
                 }
         }
 
@@ -306,6 +364,7 @@ private fun BackButton(
 private fun ExtractionResultCard(
     title: String,
     format: String,
+    sizeBytes: Long? = null,
     isDownloading: Boolean,
     downloadStatus: String?,
     isDownloadFailed: Boolean,
@@ -342,6 +401,17 @@ private fun ExtractionResultCard(
                 style = MaterialTheme.typography.bodyMedium
             )
 
+            if (sizeBytes != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Tamaño: ${formatFileSize(sizeBytes)}",
+                    color = SecondaryText,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
 
             DownloadLink(
@@ -350,15 +420,33 @@ private fun ExtractionResultCard(
                 onClick = onDownloadClick
             )
 
-            if (isDownloadFailed && errorMessage != null) {
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = errorMessage,
-                    color = DestructiveText,
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodyMedium,
+            AnimatedVisibility(
+                visible = isDownloadFailed && errorMessage != null,
+                enter = fadeIn(tween(260)) + expandVertically(animationSpec = tween(260)),
+                exit = fadeOut(tween(220)) + shrinkVertically(animationSpec = tween(220)),
+                label = "download-error-retry"
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = errorMessage ?: "",
+                        color = DestructiveText,
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    StatusActionButton(
+                        text = "REINTENTAR DESCARGA",
+                        filled = true,
+                        iconPainter = painterResource(Res.drawable.retry),
+                        onClick = onDownloadClick,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             downloadStatus?.let { status ->
@@ -373,6 +461,14 @@ private fun ExtractionResultCard(
             }
         }
     }
+}
+
+private fun formatFileSize(bytes: Long): String {
+    val mb = bytes * 100.0 / (1024.0 * 1024.0)
+    val hundredths = (mb * 100.0).roundToLong()
+    val whole = hundredths / 100
+    val frac = hundredths % 100
+    return "$whole,${frac.toString().padStart(2, '0')} MB"
 }
 
 @Composable

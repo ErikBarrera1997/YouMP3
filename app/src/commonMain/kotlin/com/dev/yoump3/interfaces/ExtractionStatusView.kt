@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,14 +37,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.generated.resources.Res
+import com.dev.yoump3.generated.resources.retry
 import com.dev.yoump3.services.AudioPlayer
+import org.jetbrains.compose.resources.painterResource
 
-private val ButtonOnColor = Color(0xFF111111)
 private val SpinnerRingSize = 72.dp
 private val SpinnerMaxSize = 96.dp
 
@@ -163,6 +168,7 @@ fun ExtractionStatusView(
     message: String?,
     onReturnToInput: () -> Unit,
     onRetryDownload: (() -> Unit)? = null,
+    onRetrySearch: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -216,6 +222,19 @@ fun ExtractionStatusView(
                 }
 
                 Spacer(Modifier.height(26.dp))
+
+                if (onRetrySearch != null) {
+                    StatusActionButton(
+                        text = "REINTENTAR BÚSQUEDA",
+                        filled = true,
+                        icon = null,
+                        iconPainter = painterResource(Res.drawable.retry),
+                        onClick = onRetrySearch,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+                }
 
                 if (onRetryDownload != null) {
                     StatusActionButton(
@@ -468,14 +487,15 @@ private fun ErrorGlyph() {
 }
 
 @Composable
-private fun StatusActionButton(
+internal fun StatusActionButton(
     text: String,
     filled: Boolean,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconPainter: Painter? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val textColor = if (filled) ButtonOnColor else PrimaryText
+    val textColor = if (filled) AppBackground else PrimaryText
     val background = if (filled) PrimaryText else AppBackground
 
     Row(
@@ -488,12 +508,21 @@ private fun StatusActionButton(
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp, vertical = 12.dp)
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = textColor,
-            modifier = Modifier.size(20.dp)
-        )
+        if (iconPainter != null) {
+            Image(
+                painter = iconPainter,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(20.dp)
+            )
+        } else if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = textColor,
+                modifier = Modifier.size(20.dp)
+            )
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             text = text,

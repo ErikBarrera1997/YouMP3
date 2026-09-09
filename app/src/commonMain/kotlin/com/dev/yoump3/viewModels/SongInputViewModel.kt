@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.dev.yoump3.appVersion
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
+import com.dev.yoump3.init.networkErrorMessage
 import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
 import kotlin.coroutines.cancellation.CancellationException
@@ -36,6 +37,7 @@ data class SongInputUiState(
     val selectedTitle: String? = null,
     val resultTitle: String? = null,
     val resultFormat: String? = null,
+    val resultSizeBytes: Long? = null,
     val resultAudioBase64: String? = null,
     val isDownloading: Boolean = false,
     val isDownloadFailed: Boolean = false,
@@ -50,6 +52,8 @@ class SongInputViewModel(
 ) : ViewModel() {
     var state by mutableStateOf(SongInputUiState())
         private set
+
+    var resultsScrollOffset: Int = 0
 
     private var searchJob: Job? = null
     private var extractionJob: Job? = null
@@ -67,6 +71,7 @@ class SongInputViewModel(
             searchResults = emptyList(),
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             isExtractionFailed = false,
             isDownloadFailed = false,
@@ -94,6 +99,7 @@ class SongInputViewModel(
             selectedTitle = null,
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             isExtractionFailed = false,
             isDownloadFailed = false,
@@ -139,7 +145,7 @@ class SongInputViewModel(
                 if (isActive) {
                     state = state.copy(
                         isLoading = false,
-                        errorMessage = "Service unavailable. Try again later."
+                        errorMessage = networkErrorMessage(e) ?: "Service unavailable. Try again later."
                     )
                 }
             } finally {
@@ -155,6 +161,7 @@ class SongInputViewModel(
             selectedTitle = title,
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             isDownloadFailed = false,
             downloadStatus = null,
@@ -169,11 +176,12 @@ class SongInputViewModel(
                     val resolvedFormat = resolveFormat(response.contentType, response.fileName)
                     val audioBase64 = response.audioBase64
 
-                    audioPlayer.load(audioBase64)
+                    audioPlayer.load(audioBase64, resolvedTitle)
                     state = state.copy(
                         isExtracting = false,
                         resultTitle = resolvedTitle,
                         resultFormat = resolvedFormat,
+                        resultSizeBytes = base64DecodedSize(audioBase64),
                         resultAudioBase64 = audioBase64
                     )
                 } else {
@@ -198,7 +206,7 @@ class SongInputViewModel(
                     state = state.copy(
                         isExtracting = false,
                         isExtractionFailed = true,
-                        errorMessage = "Service unavailable. Try again later."
+                        errorMessage = networkErrorMessage(e) ?: "Service unavailable. Try again later."
                     )
                 }
             } finally {
@@ -218,6 +226,7 @@ class SongInputViewModel(
             selectedTitle = null,
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             downloadStatus = null,
             errorMessage = null
@@ -263,6 +272,20 @@ class SongInputViewModel(
         }
     }
 
+    fun onRetrySearch() {
+        val query = state.lastSearchQuery.ifBlank { state.songQuery }
+        if (query.isBlank()) {
+            onReturnToInput()
+            return
+        }
+        state = state.copy(
+            songQuery = query,
+            isExtracting = false,
+            isExtractionFailed = false
+        )
+        onSearchClick()
+    }
+
     fun onReturnToResults() {
         cancelInFlightRequests()
         audioPlayer.stop()
@@ -274,6 +297,7 @@ class SongInputViewModel(
             selectedTitle = null,
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             downloadStatus = null,
             errorMessage = null
@@ -291,6 +315,7 @@ class SongInputViewModel(
             selectedTitle = null,
             resultTitle = null,
             resultFormat = null,
+            resultSizeBytes = null,
             resultAudioBase64 = null,
             downloadStatus = null,
             errorMessage = null
@@ -318,5 +343,13 @@ class SongInputViewModel(
             .replace(Regex("""\s+"""), " ")
             .trim()
         return cleaned.ifEmpty { "audio" }.take(80)
+    }
+
+    private fun base64DecodedSize(base64: String): Long {
+        val length = base64.length
+        var padding = 0
+        if (length > 0 && base64[length - 1] == '=') padding++
+        if (length > 1 && base64[length - 2] == '=') padding++
+        return (length * 3L / 4L) - padding
     }
 }

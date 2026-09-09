@@ -12,7 +12,7 @@ class DesktopAudioPlayer : AudioPlayer {
     private var updateThread: Thread? = null
     private var running = false
 
-    override fun load(audioBase64: String) {
+    override fun load(audioBase64: String, title: String) {
         release()
 
         val bytes = Base64.getDecoder().decode(audioBase64)

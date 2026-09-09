@@ -1,22 +1,43 @@
 package com.dev.yoump3.services
 
+import android.content.Context
+import android.content.Intent
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.util.Base64
+import androidx.core.app.NotificationManagerCompat
+import com.dev.yoump3.YouMp3Application
 import java.io.File
 import java.io.FileOutputStream
 
 class AndroidAudioPlayer : AudioPlayer {
 
+    companion object {
+        @Volatile
+        var instance: AndroidAudioPlayer? = null
+            private set
+
+        @Volatile
+        var activeTitle: String = ""
+    }
+
     override val state = AudioPlayerState()
+
+    private val appContext: Context = YouMp3Application.appContext
 
     private var player: MediaPlayer? = null
     private var tempFile: File? = null
     private var updateThread: Thread? = null
     private var running = false
 
-    override fun load(audioBase64: String) {
+    init {
+        instance = this
+    }
+
+    override fun load(audioBase64: String, title: String) {
         release()
+
+        activeTitle = title
 
         val bytes = Base64.decode(audioBase64, Base64.DEFAULT)
         val file = File.createTempFile("yoump3_preview", ".mp3")
@@ -36,11 +57,14 @@ class AndroidAudioPlayer : AudioPlayer {
             stopPolling()
             state.isPlaying = false
             state.positionMs = 0L
+            stopForegroundNotification()
         }
         player = mp
         state.durationMs = mp.duration.toLong().coerceAtLeast(0L)
         state.positionMs = 0L
         state.isPlaying = false
+
+        MediaPlayerService.start(appContext)
     }
 
     override fun toggle() {
@@ -54,6 +78,7 @@ class AndroidAudioPlayer : AudioPlayer {
             state.isPlaying = true
             startPolling()
         }
+        refreshNotification()
     }
 
     override fun seekTo(positionMs: Long) {
@@ -70,6 +95,7 @@ class AndroidAudioPlayer : AudioPlayer {
         state.isPlaying = false
         state.positionMs = 0L
         stopPolling()
+        stopForegroundNotification()
     }
 
     override fun release() {
@@ -88,6 +114,22 @@ class AndroidAudioPlayer : AudioPlayer {
         state.isPlaying = false
         state.positionMs = 0L
         state.durationMs = 0L
+        activeTitle = ""
+        stopForegroundNotification()
+    }
+
+    private fun refreshNotification() {
+        if (MediaPlayerService.isRunning) {
+            NotificationManagerCompat.from(appContext)
+                .notify(MediaPlayerService.NOTIFICATION_ID, MediaPlayerService.buildNotification(appContext))
+        } else if (state.isPlaying) {
+            MediaPlayerService.start(appContext)
+        }
+    }
+
+    private fun stopForegroundNotification() {
+        NotificationManagerCompat.from(appContext).cancel(MediaPlayerService.NOTIFICATION_ID)
+        appContext.stopService(Intent(appContext, MediaPlayerService::class.java))
     }
 
     private fun startPolling() {

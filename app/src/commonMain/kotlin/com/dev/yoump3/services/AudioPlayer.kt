@@ -13,7 +13,7 @@ class AudioPlayerState {
 
 interface AudioPlayer {
     val state: AudioPlayerState
-    fun load(audioBase64: String)
+    fun load(audioBase64: String, title: String = "")
     fun toggle()
     fun seekTo(positionMs: Long)
     fun stop()
