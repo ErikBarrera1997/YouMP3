@@ -19,11 +19,10 @@ class AndroidAudioSaver(
     private val context: Context
 ) : AudioSaver {
 
-    override suspend fun save(fileName: String, contentType: String, audioBase64: String): String {
+    override suspend fun save(fileName: String, contentType: String, audio: ByteArray): String {
         val appContext = context.applicationContext
         return withContext(Dispatchers.IO) {
             coroutineContext.ensureActive()
-            val bytes = android.util.Base64.decode(audioBase64, android.util.Base64.DEFAULT)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val contentValues = ContentValues().apply {
@@ -37,7 +36,7 @@ class AndroidAudioSaver(
                     ?: error("No se pudo crear el archivo en Descargas")
                 try {
                     coroutineContext.ensureActive()
-                    resolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    resolver.openOutputStream(uri)?.use { it.write(audio) }
                         ?: error("No se pudo abrir el archivo para escritura")
                     coroutineContext.ensureActive()
                     contentValues.clear()
@@ -57,7 +56,7 @@ class AndroidAudioSaver(
             }
             val file = File(downloads, fileName)
             coroutineContext.ensureActive()
-            FileOutputStream(file).use { it.write(bytes) }
+            FileOutputStream(file).use { it.write(audio) }
             showDownloadNotification(appContext, fileName)
             file.absolutePath
         }

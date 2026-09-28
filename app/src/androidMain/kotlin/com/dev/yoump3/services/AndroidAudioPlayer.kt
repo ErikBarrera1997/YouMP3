@@ -1,10 +1,13 @@
 package com.dev.yoump3.services
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.util.Base64
+import android.os.Build
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import com.dev.yoump3.YouMp3Application
 import java.io.File
@@ -13,12 +16,26 @@ import java.io.FileOutputStream
 class AndroidAudioPlayer : AudioPlayer {
 
     companion object {
+        private const val PREVIEW_PREFIX = "yoump3_preview"
+        private const val PREVIEW_SUFFIX = ".mp3"
+
         @Volatile
         var instance: AndroidAudioPlayer? = null
             private set
 
         @Volatile
         var activeTitle: String = ""
+
+        /**
+         * Borra los temporales de previsualización que dejó un proceso que murió antes de
+         * liberarlos. Android nunca limpia la caché de la app por su cuenta.
+         */
+        fun sweepStalePreviews(context: Context) {
+            val stale = context.cacheDir.listFiles()
+                ?.filter { it.isFile && it.name.startsWith(PREVIEW_PREFIX) }
+                ?: return
+            stale.forEach { it.delete() }
+        }
     }
 
     override val state = AudioPlayerState()
@@ -27,6 +44,7 @@ class AndroidAudioPlayer : AudioPlayer {
 
     private var player: MediaPlayer? = null
     private var tempFile: File? = null
+    private var loadedAudio: ExtractedAudio? = null
     private var updateThread: Thread? = null
     private var running = false
 
@@ -34,15 +52,17 @@ class AndroidAudioPlayer : AudioPlayer {
         instance = this
     }
 
-    override fun load(audioBase64: String, title: String) {
+    override fun load(audio: ExtractedAudio, title: String) {
+        if (audio === loadedAudio) return
+
         release()
 
         activeTitle = title
 
-        val bytes = Base64.decode(audioBase64, Base64.DEFAULT)
-        val file = File.createTempFile("yoump3_preview", ".mp3")
-        FileOutputStream(file).use { it.write(bytes) }
+        val file = File.createTempFile(PREVIEW_PREFIX, PREVIEW_SUFFIX, appContext.cacheDir)
+        FileOutputStream(file).use { it.write(audio.bytes) }
         tempFile = file
+        loadedAudio = audio
 
         val mp = MediaPlayer()
         mp.setAudioAttributes(
@@ -111,6 +131,7 @@ class AndroidAudioPlayer : AudioPlayer {
         player = null
         tempFile?.delete()
         tempFile = null
+        loadedAudio = null
         state.isPlaying = false
         state.positionMs = 0L
         state.durationMs = 0L
@@ -120,8 +141,13 @@ class AndroidAudioPlayer : AudioPlayer {
 
     private fun refreshNotification() {
         if (MediaPlayerService.isRunning) {
-            NotificationManagerCompat.from(appContext)
-                .notify(MediaPlayerService.NOTIFICATION_ID, MediaPlayerService.buildNotification(appContext))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ActivityCompat.checkSelfPermission(appContext, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                NotificationManagerCompat.from(appContext)
+                    .notify(MediaPlayerService.NOTIFICATION_ID, MediaPlayerService.buildNotification(appContext))
+            }
         } else if (state.isPlaying) {
             MediaPlayerService.start(appContext)
         }

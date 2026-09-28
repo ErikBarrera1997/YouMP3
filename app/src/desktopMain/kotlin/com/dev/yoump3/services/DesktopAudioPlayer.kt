@@ -1,7 +1,6 @@
 package com.dev.yoump3.services
 
 import java.io.ByteArrayInputStream
-import java.util.Base64
 import javax.sound.sampled.AudioSystem
 
 class DesktopAudioPlayer : AudioPlayer {
@@ -9,14 +8,16 @@ class DesktopAudioPlayer : AudioPlayer {
     override val state = AudioPlayerState()
 
     private var clip: javax.sound.sampled.Clip? = null
+    private var loadedAudio: ExtractedAudio? = null
     private var updateThread: Thread? = null
     private var running = false
 
-    override fun load(audioBase64: String, title: String) {
+    override fun load(audio: ExtractedAudio, title: String) {
+        if (audio === loadedAudio) return
+
         release()
 
-        val bytes = Base64.getDecoder().decode(audioBase64)
-        val stream = AudioSystem.getAudioInputStream(ByteArrayInputStream(bytes))
+        val stream = AudioSystem.getAudioInputStream(ByteArrayInputStream(audio.bytes))
         val loaded = AudioSystem.getClip()
         loaded.open(stream)
         loaded.addLineListener { lineEvent ->
@@ -30,6 +31,7 @@ class DesktopAudioPlayer : AudioPlayer {
             }
         }
         clip = loaded
+        loadedAudio = audio
         state.durationMs = loaded.microsecondLength / 1000L
         state.positionMs = 0L
         state.isPlaying = false
@@ -70,6 +72,7 @@ class DesktopAudioPlayer : AudioPlayer {
         running = false
         clip?.close()
         clip = null
+        loadedAudio = null
         state.isPlaying = false
         state.positionMs = 0L
         state.durationMs = 0L

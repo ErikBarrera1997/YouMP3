@@ -69,8 +69,12 @@ val localProperties = Properties().apply {
         f.inputStream().use { load(it) }
     }
 }
-val serverBaseUrl: String =
-    localProperties.getProperty("yoump3.serverUrl") ?: "http://192.168.1.9:8088"
+val serverBaseUrl: String = localProperties.getProperty("yoump3.serverUrl")
+    ?: error(
+        "Missing 'yoump3.serverUrl' in local.properties. " +
+            "Add a line like: yoump3.serverUrl=http://192.168.1.17:8088 " +
+            "(use 10.0.2.2 for the Android emulator, or the host LAN IP for a physical device)."
+    )
 
 android {
     namespace = "com.dev.yoump3"
@@ -120,6 +124,14 @@ android {
         compose = true
         buildConfig = true
     }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = true
+        }
+    }
 }
 
 compose.desktop {
@@ -164,4 +176,23 @@ val generateDesktopAppVersion = tasks.register("generateDesktopAppVersion") {
     }
 }
 
+val generateDesktopServerUrl = tasks.register("generateDesktopServerUrl") {
+    val outputDir = layout.buildDirectory.dir("generated/desktopServerUrl")
+    val serverUrl = serverBaseUrl
+    inputs.property("serverUrl", serverUrl)
+    outputs.dir(outputDir)
+    doLast {
+        val file = outputDir.get().file("com/dev/yoump3/config/DesktopServerUrl.desktop.kt").asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            |package com.dev.yoump3.config
+            |
+            |internal val defaultServerBaseUrl: String = "$serverUrl"
+            |""".trimMargin()
+        )
+    }
+}
+
+kotlin.sourceSets.getByName("desktopMain").kotlin.srcDir(generateDesktopServerUrl)
 kotlin.sourceSets.getByName("desktopMain").kotlin.srcDir(generateDesktopAppVersion)

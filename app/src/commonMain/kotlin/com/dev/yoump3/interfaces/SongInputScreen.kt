@@ -232,7 +232,7 @@ fun SongInputScreenContent(
                                 errorMessage = if (state.isDownloadFailed) state.errorMessage else null,
                                 onDownloadClick = viewModel::onDownloadClick
                             )
-                            if (state.resultAudioBase64 != null) {
+                            if (state.hasExtraction) {
                                 Spacer(Modifier.height(12.dp))
                                 MiniPlayer(
                                     audioPlayer = viewModel.audioPlayer,

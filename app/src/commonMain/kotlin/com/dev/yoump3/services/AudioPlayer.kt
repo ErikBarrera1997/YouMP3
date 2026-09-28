@@ -13,7 +13,12 @@ class AudioPlayerState {
 
 interface AudioPlayer {
     val state: AudioPlayerState
-    fun load(audioBase64: String, title: String = "")
+
+    /**
+     * Reproduce una extracción ya terminada. Si el mismo buffer ya está cargado no se vuelve a
+     * leer ni a decodificar nada: el reproductor solo consume lo que la extracción entregó.
+     */
+    fun load(audio: ExtractedAudio, title: String = "")
     fun toggle()
     fun seekTo(positionMs: Long)
     fun stop()

@@ -11,6 +11,8 @@ import com.dev.yoump3.init.YouMp3Api
 import com.dev.yoump3.init.networkErrorMessage
 import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
+import com.dev.yoump3.services.ExtractedAudio
+import com.dev.yoump3.services.decodeBase64
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -38,7 +40,7 @@ data class SongInputUiState(
     val resultTitle: String? = null,
     val resultFormat: String? = null,
     val resultSizeBytes: Long? = null,
-    val resultAudioBase64: String? = null,
+    val hasExtraction: Boolean = false,
     val isDownloading: Boolean = false,
     val isDownloadFailed: Boolean = false,
     val downloadStatus: String? = null,
@@ -58,26 +60,18 @@ class SongInputViewModel(
     private var searchJob: Job? = null
     private var extractionJob: Job? = null
 
+    private var extractedAudio: ExtractedAudio? = null
+
     override fun onCleared() {
-        audioPlayer.release()
+        purgeExtractedAudio()
         super.onCleared()
     }
 
     fun onSongQueryChange(value: String) {
         val sanitized = sanitizeSongQuery(value)
         audioPlayer.stop()
-        state = state.copy(
-            songQuery = sanitized,
-            searchResults = emptyList(),
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            isExtractionFailed = false,
-            isDownloadFailed = false,
-            downloadStatus = null,
-            errorMessage = null
-        )
+        purgeExtractedAudio()
+        state = clearExtractionState().copy(songQuery = sanitized, searchResults = emptyList())
     }
 
     private fun sanitizeSongQuery(query: String): String {
@@ -91,20 +85,12 @@ class SongInputViewModel(
         if (query.isEmpty()) return
 
         audioPlayer.stop()
-        state = state.copy(
+        purgeExtractedAudio()
+        state = clearExtractionState().copy(
             lastSearchQuery = query,
             searchRequests = state.searchRequests + 1,
             isLoading = true,
-            searchResults = emptyList(),
-            selectedTitle = null,
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            isExtractionFailed = false,
-            isDownloadFailed = false,
-            downloadStatus = null,
-            errorMessage = null
+            searchResults = emptyList()
         )
 
         searchJob?.cancel()
@@ -155,17 +141,9 @@ class SongInputViewModel(
     }
 
     fun onSelectResult(videoId: String, title: String) {
-        state = state.copy(
+        state = clearExtractionState().copy(
             isExtracting = true,
-            isExtractionFailed = false,
-            selectedTitle = title,
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            isDownloadFailed = false,
-            downloadStatus = null,
-            errorMessage = null
+            selectedTitle = title
         )
 
         extractionJob = viewModelScope.launch {
@@ -174,15 +152,17 @@ class SongInputViewModel(
                 if (response.success && response.audioBase64 != null) {
                     val resolvedTitle = response.videoTitle ?: title
                     val resolvedFormat = resolveFormat(response.contentType, response.fileName)
-                    val audioBase64 = response.audioBase64
+                    val audio = ExtractedAudio(decodeBase64(response.audioBase64))
 
-                    audioPlayer.load(audioBase64, resolvedTitle)
+                    purgeExtractedAudio()
+                    audioPlayer.load(audio, resolvedTitle)
+                    extractedAudio = audio
                     state = state.copy(
                         isExtracting = false,
                         resultTitle = resolvedTitle,
                         resultFormat = resolvedFormat,
-                        resultSizeBytes = base64DecodedSize(audioBase64),
-                        resultAudioBase64 = audioBase64
+                        resultSizeBytes = audio.sizeBytes,
+                        hasExtraction = true
                     )
                 } else {
                     state = state.copy(
@@ -217,20 +197,8 @@ class SongInputViewModel(
 
     fun onCancelExtraction() {
         cancelInFlightRequests()
-        audioPlayer.stop()
-        state = state.copy(
-            isExtracting = false,
-            isExtractionFailed = false,
-            isDownloading = false,
-            isDownloadFailed = false,
-            selectedTitle = null,
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            downloadStatus = null,
-            errorMessage = null
-        )
+        purgeExtractedAudio()
+        state = clearExtractionState()
     }
 
     private fun cancelInFlightRequests() {
@@ -241,8 +209,28 @@ class SongInputViewModel(
         extractionJob = null
     }
 
+    private fun purgeExtractedAudio() {
+        audioPlayer.release()
+        extractedAudio?.wipe()
+        extractedAudio = null
+    }
+
+    private fun clearExtractionState() = state.copy(
+        isExtracting = false,
+        isExtractionFailed = false,
+        isDownloading = false,
+        isDownloadFailed = false,
+        hasExtraction = false,
+        selectedTitle = null,
+        resultTitle = null,
+        resultFormat = null,
+        resultSizeBytes = null,
+        downloadStatus = null,
+        errorMessage = null
+    )
+
     fun onDownloadClick() {
-        val base64 = state.resultAudioBase64 ?: return
+        val audio = extractedAudio ?: return
         val fileName = "${sanitizeFileName(state.resultTitle ?: "audio")}.mp3"
 
         state = state.copy(
@@ -254,10 +242,12 @@ class SongInputViewModel(
 
         viewModelScope.launch {
             try {
-                val path = audioSaver.save(fileName, "audio/mpeg", base64)
+                val path = audioSaver.save(fileName, "audio/mpeg", audio.bytes)
                 audioPlayer.stop()
+                purgeExtractedAudio()
                 state = state.copy(
                     isDownloading = false,
+                    hasExtraction = false,
                     downloadStatus = "Descargado en: $path"
                 )
             } catch (e: CancellationException) {
@@ -289,37 +279,15 @@ class SongInputViewModel(
     fun onReturnToResults() {
         cancelInFlightRequests()
         audioPlayer.stop()
-        state = state.copy(
-            isExtracting = false,
-            isExtractionFailed = false,
-            isDownloading = false,
-            isDownloadFailed = false,
-            selectedTitle = null,
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            downloadStatus = null,
-            errorMessage = null
-        )
+        purgeExtractedAudio()
+        state = clearExtractionState()
     }
 
     fun onReturnToInput() {
         cancelInFlightRequests()
         audioPlayer.stop()
-        state = state.copy(
-            isExtracting = false,
-            isExtractionFailed = false,
-            isDownloading = false,
-            isDownloadFailed = false,
-            selectedTitle = null,
-            resultTitle = null,
-            resultFormat = null,
-            resultSizeBytes = null,
-            resultAudioBase64 = null,
-            downloadStatus = null,
-            errorMessage = null
-        )
+        purgeExtractedAudio()
+        state = clearExtractionState()
     }
 
     private fun resolveFormat(contentType: String?, fileName: String?): String {
@@ -343,13 +311,5 @@ class SongInputViewModel(
             .replace(Regex("""\s+"""), " ")
             .trim()
         return cleaned.ifEmpty { "audio" }.take(80)
-    }
-
-    private fun base64DecodedSize(base64: String): Long {
-        val length = base64.length
-        var padding = 0
-        if (length > 0 && base64[length - 1] == '=') padding++
-        if (length > 1 && base64[length - 2] == '=') padding++
-        return (length * 3L / 4L) - padding
     }
 }
