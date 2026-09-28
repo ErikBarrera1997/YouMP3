@@ -69,12 +69,14 @@ val localProperties = Properties().apply {
         f.inputStream().use { load(it) }
     }
 }
-val serverBaseUrl: String = localProperties.getProperty("yoump3.serverUrl")
-    ?: error(
-        "Missing 'yoump3.serverUrl' in local.properties. " +
-            "Add a line like: yoump3.serverUrl=http://192.168.1.17:8088 " +
-            "(use 10.0.2.2 for the Android emulator, or the host LAN IP for a physical device)."
-    )
+val serverBaseUrl: String = (
+    localProperties.getProperty("yoump3.serverUrl")
+        ?: providers.gradleProperty("YouMp3ServerUrl").get()
+        ?: error(
+            "No backend URL configured. Set 'YouMp3ServerUrl' in gradle.properties " +
+                "or 'yoump3.serverUrl' in local.properties."
+        )
+    ).trimEnd('/')
 
 android {
     namespace = "com.dev.yoump3"
