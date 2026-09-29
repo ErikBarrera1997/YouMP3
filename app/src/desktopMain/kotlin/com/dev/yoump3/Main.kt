@@ -12,7 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dev.yoump3.config.DesktopAppConfig
 import com.dev.yoump3.dependencies.PlatformDependencies
 import com.dev.yoump3.interfaces.YouMp3App
-import com.dev.yoump3.preferences.DesktopThemeStore
+import com.dev.yoump3.preferences.DesktopAppPreferences
 import com.dev.yoump3.services.DesktopAudioSaver
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 
@@ -40,14 +40,13 @@ fun main() = application {
                 PlatformDependencies(
                     appConfig = DesktopAppConfig(),
                     audioSaver = DesktopAudioSaver(),
-                    themeStore = DesktopThemeStore()
+                    appPreferences = DesktopAppPreferences()
                 )
             }
-            val viewModel = viewModel { YouMp3ViewModel(deps.themeStore) }
+            val viewModel = viewModel { YouMp3ViewModel(deps.appPreferences, deps.appConfig) }
             YouMp3App(
                 dependencies = deps,
-                viewModel = viewModel,
-                onExit = ::exitApplication
+                viewModel = viewModel
             )
         }
     }

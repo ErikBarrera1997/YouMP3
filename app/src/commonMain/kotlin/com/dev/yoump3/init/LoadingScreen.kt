@@ -28,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.dev.yoump3.error.AppError
+import com.dev.yoump3.error.AppErrorKind
 import com.dev.yoump3.interfaces.AppBackground
 import com.dev.yoump3.interfaces.AppFooter
 import com.dev.yoump3.interfaces.PrimaryText
@@ -38,7 +40,7 @@ private val WaveRingSize = 120.dp
 private val WaveMaxSize = WaveRingSize * 1.75f
 
 @Composable
-fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: () -> Unit) {
+fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: (AppError) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -81,12 +83,9 @@ fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: () -> Unit) {
         }
 
         LaunchedEffect(Unit) {
-            val result = api.checkConnection()
-            if (result.isSuccess) {
-                onConnected()
-            } else {
-                onError()
-            }
+            api.checkConnection()
+                .onSuccess { onConnected() }
+                .onFailure { onError((it as? ApiException)?.error ?: AppError(AppErrorKind.UNKNOWN)) }
         }
     }
 }

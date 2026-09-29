@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.dev.yoump3.appVersion
-import com.dev.yoump3.preferences.ThemeStore
+import com.dev.yoump3.config.AppConfig
+import com.dev.yoump3.preferences.AppPreferences
 
 enum class YouMp3Screen {
     Home,
@@ -18,16 +19,22 @@ data class YouMp3UiState(
     val title: String = "FIND IT!",
     val footer: String = "BY CLEVER CLOUD · v$appVersion",
     val currentScreen: YouMp3Screen = YouMp3Screen.Home,
-    val findButtonPresses: Int = 0
+    val findButtonPresses: Int = 0,
+    val connectionCheckToken: Int = 0
 )
 
 class YouMp3ViewModel(
-    themeStore: ThemeStore
+    appPreferences: AppPreferences,
+    appConfig: AppConfig
 ) : ViewModel() {
     var state by mutableStateOf(YouMp3UiState())
         private set
 
-    val settingsViewModel = SettingsViewModel(themeStore)
+    val settingsViewModel = SettingsViewModel(
+        appPreferences = appPreferences,
+        appConfig = appConfig,
+        onServerUrlCommitted = { onRecheckConnection() }
+    )
 
     fun onFindButtonClick() {
         state = state.copy(
@@ -46,6 +53,15 @@ class YouMp3ViewModel(
 
     fun onCloseSettingsClick() {
         state = state.copy(currentScreen = YouMp3Screen.Home)
+    }
+
+    /** Vuelve a la pantalla de inicio desde donde sea, sin tocar el estado de la otra VM. */
+    fun onReturnToHome() {
+        state = state.copy(currentScreen = YouMp3Screen.Home)
+    }
+
+    fun onRecheckConnection() {
+        state = state.copy(connectionCheckToken = state.connectionCheckToken + 1)
     }
 
     fun onBackClick(): Boolean {

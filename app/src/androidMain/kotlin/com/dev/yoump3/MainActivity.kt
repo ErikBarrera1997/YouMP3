@@ -13,12 +13,19 @@ import androidx.core.content.ContextCompat
 import com.dev.yoump3.config.AndroidAppConfig
 import com.dev.yoump3.dependencies.PlatformDependencies
 import com.dev.yoump3.interfaces.YouMp3App
-import com.dev.yoump3.preferences.AndroidThemeStore
+import com.dev.yoump3.preferences.AndroidAppPreferences
 import com.dev.yoump3.services.AndroidAudioSaver
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 
 class MainActivity : ComponentActivity() {
-    private val viewModel by lazy { YouMp3ViewModel(AndroidThemeStore(applicationContext)) }
+    private val dependencies by lazy {
+        PlatformDependencies(
+            appConfig = AndroidAppConfig(),
+            audioSaver = AndroidAudioSaver(applicationContext),
+            appPreferences = AndroidAppPreferences(applicationContext)
+        )
+    }
+    private val viewModel by lazy { YouMp3ViewModel(dependencies.appPreferences, dependencies.appConfig) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,13 +45,8 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             YouMp3App(
-                dependencies = PlatformDependencies(
-                    appConfig = AndroidAppConfig(),
-                    audioSaver = AndroidAudioSaver(applicationContext),
-                    themeStore = AndroidThemeStore(applicationContext)
-                ),
-                viewModel = viewModel,
-                onExit = { finishAffinity() }
+                dependencies = dependencies,
+                viewModel = viewModel
             )
         }
     }

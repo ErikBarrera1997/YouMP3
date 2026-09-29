@@ -20,3 +20,9 @@ Thumbs.db
 !*.gif
 !*.svg
 !*.bmp
+
+# Test sources (app/src/test, app/src/androidTest, app/src/*Test)
+# Test build output (test-results, reports) ya queda cubierto por "build" de arriba.
+app/src/test/
+app/src/androidTest/
+app/src/*Test/

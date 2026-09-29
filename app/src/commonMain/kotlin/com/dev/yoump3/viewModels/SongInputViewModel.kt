@@ -6,9 +6,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dev.yoump3.appVersion
+import com.dev.yoump3.error.AppError
+import com.dev.yoump3.error.AppErrorCatalog
+import com.dev.yoump3.error.AppErrorKind
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
-import com.dev.yoump3.init.networkErrorMessage
 import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
 import com.dev.yoump3.services.ExtractedAudio
@@ -44,7 +46,8 @@ data class SongInputUiState(
     val isDownloading: Boolean = false,
     val isDownloadFailed: Boolean = false,
     val downloadStatus: String? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val serviceError: AppError? = null
 )
 
 class SongInputViewModel(
@@ -97,42 +100,33 @@ class SongInputViewModel(
         searchJob = viewModelScope.launch {
             try {
                 val response = api.searchSongs(query)
-                if (response.success) {
-                    state = state.copy(
-                        isLoading = false,
-                        searchResults = response.results.mapNotNull { result ->
-                            val videoId = result.videoId
-                            val title = result.title
-                            if (videoId.isNullOrBlank() || title.isNullOrBlank()) null
-                            else SearchResultUi(
-                                videoId = videoId,
-                                title = title,
-                                author = result.author ?: "Desconocido",
-                                durationSeconds = result.durationSeconds
-                            )
-                        }
-                    )
-                } else {
-                    state = state.copy(
-                        isLoading = false,
-                        errorMessage = response.message
-                    )
-                }
+                state = state.copy(
+                    isLoading = false,
+                    searchResults = response.results.mapNotNull { result ->
+                        val videoId = result.videoId
+                        val title = result.title
+                        if (videoId.isNullOrBlank() || title.isNullOrBlank()) null
+                        else SearchResultUi(
+                            videoId = videoId,
+                            title = title,
+                            author = result.author ?: "Desconocido",
+                            durationSeconds = result.durationSeconds
+                        )
+                    }
+                )
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: ApiException) {
-                if (isActive) {
-                    state = state.copy(
-                        isLoading = false,
-                        errorMessage = e.apiMessage
-                    )
-                }
             } catch (e: Exception) {
                 if (isActive) {
-                    state = state.copy(
-                        isLoading = false,
-                        errorMessage = networkErrorMessage(e) ?: "Service unavailable. Try again later."
-                    )
+                    val error = toAppError(e)
+                    if (error.blocksScreen) {
+                        raiseServiceUnavailable(error)
+                    } else {
+                        state = state.copy(
+                            isLoading = false,
+                            errorMessage = error.detail
+                        )
+                    }
                 }
             } finally {
                 searchJob = null
@@ -149,45 +143,34 @@ class SongInputViewModel(
         extractionJob = viewModelScope.launch {
             try {
                 val response = api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
-                if (response.success && response.audioBase64 != null) {
-                    val resolvedTitle = response.videoTitle ?: title
-                    val resolvedFormat = resolveFormat(response.contentType, response.fileName)
-                    val audio = ExtractedAudio(decodeBase64(response.audioBase64))
+                val resolvedTitle = response.videoTitle ?: title
+                val resolvedFormat = resolveFormat(response.contentType, response.fileName)
+                val audio = ExtractedAudio(decodeBase64(response.audioBase64))
 
-                    purgeExtractedAudio()
-                    audioPlayer.load(audio, resolvedTitle)
-                    extractedAudio = audio
-                    state = state.copy(
-                        isExtracting = false,
-                        resultTitle = resolvedTitle,
-                        resultFormat = resolvedFormat,
-                        resultSizeBytes = audio.sizeBytes,
-                        hasExtraction = true
-                    )
-                } else {
-                    state = state.copy(
-                        isExtracting = false,
-                        isExtractionFailed = true,
-                        errorMessage = response.message
-                    )
-                }
+                purgeExtractedAudio()
+                audioPlayer.load(audio, resolvedTitle)
+                extractedAudio = audio
+                state = state.copy(
+                    isExtracting = false,
+                    resultTitle = resolvedTitle,
+                    resultFormat = resolvedFormat,
+                    resultSizeBytes = audio.sizeBytes,
+                    hasExtraction = true
+                )
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: ApiException) {
-                if (isActive) {
-                    state = state.copy(
-                        isExtracting = false,
-                        isExtractionFailed = true,
-                        errorMessage = e.apiMessage
-                    )
-                }
             } catch (e: Exception) {
                 if (isActive) {
-                    state = state.copy(
-                        isExtracting = false,
-                        isExtractionFailed = true,
-                        errorMessage = networkErrorMessage(e) ?: "Service unavailable. Try again later."
-                    )
+                    val error = toAppError(e)
+                    if (error.blocksScreen) {
+                        raiseServiceUnavailable(error)
+                    } else {
+                        state = state.copy(
+                            isExtracting = false,
+                            isExtractionFailed = true,
+                            errorMessage = error.detail
+                        )
+                    }
                 }
             } finally {
                 extractionJob = null
@@ -199,6 +182,28 @@ class SongInputViewModel(
         cancelInFlightRequests()
         purgeExtractedAudio()
         state = clearExtractionState()
+    }
+
+    fun onServiceErrorDismissed() {
+        cancelInFlightRequests()
+        purgeExtractedAudio()
+        state = clearExtractionState().copy(
+            serviceError = null
+        )
+    }
+
+    private fun raiseServiceUnavailable(error: AppError) {
+        purgeExtractedAudio()
+        state = SongInputUiState(
+            searchResults = emptyList(),
+            serviceError = error
+        )
+    }
+
+    /** Toda excepcion se traduce aqui a un [AppError] ya resuelto por el catalogo. */
+    private fun toAppError(e: Throwable): AppError = when (e) {
+        is ApiException -> e.error
+        else -> AppErrorCatalog.resolve(e)
     }
 
     private fun cancelInFlightRequests() {
@@ -256,7 +261,7 @@ class SongInputViewModel(
                 state = state.copy(
                     isDownloading = false,
                     isDownloadFailed = true,
-                    errorMessage = "No se pudo guardar el archivo."
+                    errorMessage = AppErrorKind.SAVE_FAILED.detail
                 )
             }
         }
