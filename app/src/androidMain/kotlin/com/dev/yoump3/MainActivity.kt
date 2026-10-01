@@ -8,8 +8,11 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dev.yoump3.config.AndroidAppConfig
 import com.dev.yoump3.dependencies.PlatformDependencies
 import com.dev.yoump3.interfaces.YouMp3App
@@ -25,7 +28,12 @@ class MainActivity : ComponentActivity() {
             appPreferences = AndroidAppPreferences(applicationContext)
         )
     }
-    private val viewModel by lazy { YouMp3ViewModel(dependencies.appPreferences, dependencies.appConfig) }
+
+    // En el ViewModelStore, no en un campo lazy: así sobrevive a un cambio de configuración. Con
+    // `by lazy` la Activity se recrea y se perderían la ventana activa y la navegación.
+    private val viewModel: YouMp3ViewModel by viewModels {
+        viewModelFactory { initializer { YouMp3ViewModel(dependencies) } }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,10 +52,7 @@ class MainActivity : ComponentActivity() {
             }
         )
         setContent {
-            YouMp3App(
-                dependencies = dependencies,
-                viewModel = viewModel
-            )
+            YouMp3App(viewModel = viewModel)
         }
     }
 

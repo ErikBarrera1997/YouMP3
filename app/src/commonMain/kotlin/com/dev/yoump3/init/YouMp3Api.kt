@@ -88,8 +88,21 @@ class YouMp3Api(
      * Cliente separado para el sondeo. No puede compartir timeouts con el de las búsquedas: una
      * extracción puede tardar 180 s legítimamente, pero la pantalla de arranque no debe esperar
      * ni un minuto para saber que no hay nadie escuchando.
+     *
+     * El `lazy` se guarda aparte para poder distinguir "todavía no se ha construido" de "vale
+     * cero": leerlo en [close] crearía un cliente entero para cerrar nada.
+     *
+     * "no hay nadie escuchando" es cierto para un servidor caído, pero no para una instancia en
+     * reposo: en Render el servicio se duerme tras ~15 min de inactividad y al primer request la
+     * plataforma tarda 30-60 s en levantarlo. Durante ese rato la pasarela acepta la conexión y
+     * no contesta, así que [PROBE_TIMEOUT_MS] se agota antes de tiempo. El síntoma es que el
+     * arranque necesita ~3 intentos, y es un coste aceptado a cambio de no dejar la pantalla
+     * bloqueada un minuto ante un servidor que sí está caído de verdad.
+     *
+     * Si algún día se quiere arreglar de raiz, el arreglo es de infraestructura (una instancia sin
+     * suspensión, o un ping que la despierte), no subir este timeout.
      */
-    private val probeClient by lazy {
+    private val probeClientDelegate = lazy {
         HttpClient {
             install(ContentNegotiation) {
                 json(Json { ignoreUnknownKeys = true })
@@ -100,6 +113,18 @@ class YouMp3Api(
                 socketTimeoutMillis = PROBE_TIMEOUT_MS
             }
         }
+    }
+
+    private val probeClient by probeClientDelegate
+
+    /**
+     * Cierra los dos clientes. Cada `HttpClient` de Ktor arrastra un scope de corrutinas y los hilos
+     * de su motor, y no los suelta el recolector por mucho que quede huérfano: sin esto, abrir y
+     * cerrar la app en el mismo proceso los deja acumulados.
+     */
+    fun close() {
+        client.close()
+        if (probeClientDelegate.isInitialized()) probeClient.close()
     }
 
     private fun endpoint(path: String): String = baseUrl().trimEnd('/') + path
@@ -162,11 +187,36 @@ class YouMp3Api(
                     backendMessage = parsed.message
                 )
             )
+        requireAudioWithinBudget(audio, response.status.value, parsed.message)
         return ExtractedAudioResponse(
             videoTitle = parsed.videoTitle,
             fileName = parsed.fileName,
             contentType = parsed.contentType,
             audioBase64 = audio
+        )
+    }
+
+    /**
+     * Corta la respuesta **antes** de decodificarla.
+     *
+     * El audio viaja dentro del cuerpo JSON como cadena de base64, y el pico real es de varias
+     * veces el tamaño del MP3: una cadena con el cuerpo entero, otra con el campo ya deserializado
+     * y el `ByteArray` decodificado, todas vivas a la vez. Comprobar el tamaño después de decodificar
+     * sería tarde, porque el heap ya está comprometido y el `OutOfMemoryError` no es una excepción
+     * que este código pueda recuperar.
+     *
+     * A 4 caracteres de base64 por cada 3 bytes, la longitud de la cadena ya dice cuántos bytes
+     * va a pedir el `ByteArray`, sin reservar nada.
+     */
+    private fun requireAudioWithinBudget(base64: String, statusCode: Int, backendMessage: String?) {
+        val decodedBytes = base64.length / 4L * 3L
+        if (decodedBytes <= MAX_DECODED_AUDIO_BYTES) return
+        throw ApiException(
+            AppError(
+                kind = AppErrorKind.AUDIO_TOO_LARGE,
+                statusCode = statusCode,
+                backendMessage = backendMessage
+            )
         )
     }
 
@@ -217,5 +267,23 @@ class YouMp3Api(
         val EMPTY_PROBE_BODY = """{"videoName":""}"""
         const val PROBE_CONNECT_TIMEOUT_MS = 8_000L
         const val PROBE_TIMEOUT_MS = 20_000L
+
+        /**
+         * Tope del audio decodificado, en bytes.
+         *
+         * Una canción normal ocupa alrededor de 19 MB contando el base64 de la respuesta, así que
+         * el audio decodificado ronda los 14 MB. El tope va a 32 MB para que ni una canción normal
+         * ni una duración larga en un bitrate alto se queden fuera: 32 MB son ~33 min a 128 kbps o
+         * ~13 min a 320 kbps.
+         *
+         * Ojo al precio: el pico transitorio de esa extracción es de ~117 MB (32 MB de `ByteArray`
+         * más dos cadenas de 42,7 M caracteres, a 1 byte por carácter con las cadenas compactas de
+         * ART) y de ~203 MB si el runtime los ensancha a UTF-16. Ese pico no lo baja este cliente:
+         * viene de que el audio viaje dentro del JSON. La única forma de eliminarlo es que el
+         * backend sirva el MP3 como binario, porque entonces se puede escribir en `cacheDir` sin
+         * pasar por el heap. Para el dispositivo, ese endpoint es lo que hay que hacer antes que
+         * subir este número.
+         */
+        const val MAX_DECODED_AUDIO_BYTES = 32L * 1024 * 1024
     }
 }

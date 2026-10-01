@@ -81,32 +81,6 @@ private val ErrorIcon = ImageVector.Builder(
     }
 }.build()
 
-private val RedownloadIcon = ImageVector.Builder(
-    name = "Redownload",
-    defaultWidth = 24.dp,
-    defaultHeight = 24.dp,
-    viewportWidth = 24f,
-    viewportHeight = 24f
-).apply {
-    path(fill = SolidColor(Color.Black)) {
-        moveTo(17.65f, 6.35f)
-        curveTo(16.2f, 4.9f, 14.21f, 4f, 12f, 4f)
-        curveTo(7.58f, 4f, 4.01f, 7.58f, 4.01f, 12f)
-        curveTo(4.01f, 16.42f, 7.58f, 20f, 12f, 20f)
-        curveTo(15.73f, 20f, 18.84f, 17.45f, 19.73f, 14f)
-        horizontalLineTo(17.65f)
-        curveTo(16.83f, 16.33f, 14.61f, 18f, 12f, 18f)
-        curveTo(8.69f, 18f, 6f, 15.31f, 6f, 12f)
-        curveTo(6f, 8.69f, 8.69f, 6f, 12f, 6f)
-        curveTo(13.66f, 6f, 15.14f, 6.69f, 16.22f, 7.78f)
-        lineTo(13f, 11f)
-        horizontalLineTo(21f)
-        verticalLineTo(3f)
-        lineTo(17.65f, 6.35f)
-        close()
-    }
-}.build()
-
 private val BackIcon = ImageVector.Builder(
     name = "ChevronLeft",
     defaultWidth = 24.dp,
@@ -167,8 +141,7 @@ fun ExtractionStatusView(
     title: String?,
     message: String?,
     onReturnToInput: () -> Unit,
-    onRetryDownload: (() -> Unit)? = null,
-    onRetrySearch: (() -> Unit)? = null,
+    onRetryExtraction: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -223,25 +196,13 @@ fun ExtractionStatusView(
 
                 Spacer(Modifier.height(26.dp))
 
-                if (onRetrySearch != null) {
+                if (onRetryExtraction != null) {
                     StatusActionButton(
-                        text = "REINTENTAR BÚSQUEDA",
+                        text = "REINTENTAR EXTRACCIÓN",
                         filled = true,
                         icon = null,
                         iconPainter = painterResource(Res.drawable.retry),
-                        onClick = onRetrySearch,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                if (onRetryDownload != null) {
-                    StatusActionButton(
-                        text = "REINTENTAR DESCARGA",
-                        filled = true,
-                        icon = RedownloadIcon,
-                        onClick = onRetryDownload,
+                        onClick = onRetryExtraction,
                         modifier = Modifier.fillMaxWidth()
                     )
 

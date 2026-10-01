@@ -40,7 +40,12 @@ private val WaveRingSize = 120.dp
 private val WaveMaxSize = WaveRingSize * 1.75f
 
 @Composable
-fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: (AppError) -> Unit) {
+fun InitScreen(
+    api: YouMp3Api,
+    connectionCheckToken: Int,
+    onConnected: () -> Unit,
+    onError: (AppError) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -82,7 +87,13 @@ fun InitScreen(api: YouMp3Api, onConnected: () -> Unit, onError: (AppError) -> U
             AppFooter()
         }
 
-        LaunchedEffect(Unit) {
+        /**
+         * La clave es el token y no `Unit` porque el sondeo tiene que volver a dispararse cada vez
+         * que se pide uno nuevo. Con `Unit`, si `Init` se vuelve a destino mientras su composición
+         * sigue viva en la transición de `AnimatedContent`, la clave no cambia, el efecto no se
+         * relanza y la app se queda en "CARGANDO..." para siempre sin llegar a preguntar nada.
+         */
+        LaunchedEffect(connectionCheckToken) {
             api.checkConnection()
                 .onSuccess { onConnected() }
                 .onFailure { onError((it as? ApiException)?.error ?: AppError(AppErrorKind.UNKNOWN)) }

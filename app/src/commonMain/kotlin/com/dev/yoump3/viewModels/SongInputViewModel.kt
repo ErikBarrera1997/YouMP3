@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dev.yoump3.AppBackgroundSignal
 import com.dev.yoump3.appVersion
 import com.dev.yoump3.error.AppError
 import com.dev.yoump3.error.AppErrorCatalog
@@ -39,6 +40,7 @@ data class SongInputUiState(
     val isExtracting: Boolean = false,
     val isExtractionFailed: Boolean = false,
     val selectedTitle: String? = null,
+    val selectedVideoId: String? = null,
     val resultTitle: String? = null,
     val resultFormat: String? = null,
     val resultSizeBytes: Long? = null,
@@ -55,8 +57,72 @@ class SongInputViewModel(
     private val audioSaver: AudioSaver,
     val audioPlayer: AudioPlayer
 ) : ViewModel() {
+
+    /**
+     * Extracción terminada con sus metadatos. Existe para que [extractAndDecode] pueda devolver
+     * todo de golpe y dejar de vivir en su marco la respuesta del backend, que lleva la cadena de
+     * base64.
+     */
+    private class ExtractionOutcome(
+        val audio: ExtractedAudio,
+        val title: String,
+        val format: String
+    )
+
     var state by mutableStateOf(SongInputUiState())
         private set
+
+    private val backgroundListener = AppBackgroundSignal.Listener { onAppBackgrounded() }
+
+    init {
+        AppBackgroundSignal.add(backgroundListener)
+    }
+
+    /**
+     * Suelta todo lo que este ViewModel tiene abierto.
+     *
+     * Es público, y no un simple `override` de `onCleared`, porque este ViewModel se construye a
+     * mano dentro de [YouMp3ViewModel] y por tanto no entra en ningún `ViewModelStore`: el framework
+     * nunca le llamaría `onCleared`, así que sin esta puerta explícita ni el audio se purga ni la
+     * suscripción a [AppBackgroundSignal] se retira al cerrar la app.
+     */
+    fun dispose() {
+        AppBackgroundSignal.remove(backgroundListener)
+        cancelInFlightRequests()
+        purgeExtractedAudio()
+    }
+
+    override fun onCleared() {
+        dispose()
+        super.onCleared()
+    }
+
+    /**
+     * Suelta la extracción al salir de la app, que es justo cuando el proceso pasa a ser ajusticible.
+     *
+     * Con la música en marcha no se toca nada: hay un servicio en primer plano sosteniendo el proceso
+     * a propósito, y ni la reproducción ni una extracción que va a terminar en unos segundos son
+     * memoria que sobre. Liberar ahí sería cortarle al usuario la canción que se fue a escuchar.
+     *
+     * Una extracción en curso es el peor caso: sostiene a la vez la cadena de base64 y el buffer
+     * decodificado. Se corta en lugar de dejarla rematar sola en un proceso que el sistema ya puede
+     * matar, y el usuario vuelve a los resultados para reintentarla si quiere. Si ya había audio
+     * cargado, también se suelta, porque la tarjeta y su botón de descarga leen de ese mismo buffer.
+     */
+    private fun onAppBackgrounded() {
+        if (audioPlayer.state.isPlaying) return
+
+        if (state.isExtracting) {
+            cancelInFlightRequests()
+            purgeExtractedAudio()
+            state = clearExtractionState()
+            return
+        }
+
+        if (!state.hasExtraction) return
+        purgeExtractedAudio()
+        state = clearExtractionState()
+    }
 
     var resultsScrollOffset: Int = 0
 
@@ -64,11 +130,6 @@ class SongInputViewModel(
     private var extractionJob: Job? = null
 
     private var extractedAudio: ExtractedAudio? = null
-
-    override fun onCleared() {
-        purgeExtractedAudio()
-        super.onCleared()
-    }
 
     fun onSongQueryChange(value: String) {
         val sanitized = sanitizeSongQuery(value)
@@ -137,24 +198,51 @@ class SongInputViewModel(
     fun onSelectResult(videoId: String, title: String) {
         state = clearExtractionState().copy(
             isExtracting = true,
-            selectedTitle = title
+            selectedTitle = title,
+            selectedVideoId = videoId
         )
+        runExtraction(videoId, title)
+    }
 
+    /**
+     * Reintenta la extracción del mismo video, sin volver a buscar. El fallo estaba en la
+     * extracción, así que repetir la búsqueda solo gastaría una llamada que ya funcionó.
+     */
+    fun onRetryExtraction() {
+        val videoId = state.selectedVideoId
+        val title = state.selectedTitle
+        if (videoId.isNullOrBlank() || title == null) {
+            // Sin selección guardada no hay nada que reintentar: la búsqueda es el único camino.
+            onRetrySearch()
+            return
+        }
+        state = state.copy(
+            isExtracting = true,
+            isExtractionFailed = false,
+            errorMessage = null
+        )
+        runExtraction(videoId, title)
+    }
+
+    private fun runExtraction(videoId: String, title: String) {
         extractionJob = viewModelScope.launch {
+            // El buffer decodificado todavía no es del ViewModel: solo pasa a serlo después de que
+            // `load` lo acepte. `wipe` en el `finally` cubre ese hueco, para que un fallo de
+            // reproducción no deje el MP3 en el heap hasta que pase el recolector.
+            var audio: ExtractedAudio? = null
             try {
-                val response = api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
-                val resolvedTitle = response.videoTitle ?: title
-                val resolvedFormat = resolveFormat(response.contentType, response.fileName)
-                val audio = ExtractedAudio(decodeBase64(response.audioBase64))
+                val outcome = extractAndDecode(videoId, title)
+                audio = outcome.audio
 
                 purgeExtractedAudio()
-                audioPlayer.load(audio, resolvedTitle)
-                extractedAudio = audio
+                audioPlayer.load(outcome.audio, outcome.title)
+                extractedAudio = outcome.audio
+                audio = null
                 state = state.copy(
                     isExtracting = false,
-                    resultTitle = resolvedTitle,
-                    resultFormat = resolvedFormat,
-                    resultSizeBytes = audio.sizeBytes,
+                    resultTitle = outcome.title,
+                    resultFormat = outcome.format,
+                    resultSizeBytes = outcome.audio.sizeBytes,
                     hasExtraction = true
                 )
             } catch (e: CancellationException) {
@@ -173,9 +261,26 @@ class SongInputViewModel(
                     }
                 }
             } finally {
+                audio?.wipe()
                 extractionJob = null
             }
         }
+    }
+
+    /**
+     * Extrae y decodifica en un ámbito propio para que la cadena de base64 quede fuera de alcance en
+     * cuanto existe el `ByteArray`. Devolverla desde aquí es lo que permite que el recolector la
+     * libere antes de que `load` reserve el archivo temporal y el `MediaPlayer`: si la respuesta
+     * viviera en el ámbito de [runExtraction], sus varias veces el tamaño del audio se sumarían al
+     * pico del `load` en lugar de solaparse solo con la decodificación.
+     */
+    private suspend fun extractAndDecode(videoId: String, title: String): ExtractionOutcome {
+        val response = api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
+        return ExtractionOutcome(
+            audio = ExtractedAudio(decodeBase64(response.audioBase64)),
+            title = response.videoTitle ?: title,
+            format = resolveFormat(response.contentType, response.fileName)
+        )
     }
 
     fun onCancelExtraction() {
@@ -222,11 +327,16 @@ class SongInputViewModel(
 
     private fun clearExtractionState() = state.copy(
         isExtracting = false,
+        // `cancelInFlightRequests()` puede matar un `searchJob`, y un `CancellationException` sale
+        // por encima sin pasar por los `catch` que bajan `isLoading`. Sin esto, cancelar una búsqueda
+        // dejaba el spinner girando sobre una pantalla que ya no va a recibir respuesta.
+        isLoading = false,
         isExtractionFailed = false,
         isDownloading = false,
         isDownloadFailed = false,
         hasExtraction = false,
         selectedTitle = null,
+        selectedVideoId = null,
         resultTitle = null,
         resultFormat = null,
         resultSizeBytes = null,

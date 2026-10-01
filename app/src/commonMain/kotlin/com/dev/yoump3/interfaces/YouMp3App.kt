@@ -30,11 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,56 +46,23 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.dev.yoump3.dependencies.PlatformDependencies
-import com.dev.yoump3.error.AppError
-import com.dev.yoump3.error.AppErrorSaver
 import com.dev.yoump3.generated.resources.Res
 import com.dev.yoump3.generated.resources.icon
 import com.dev.yoump3.init.InitScreen
-import com.dev.yoump3.viewModels.ErrorStatusViewModel
+import com.dev.yoump3.viewModels.AppWindow
 import com.dev.yoump3.viewModels.SongInputViewModel
 import com.dev.yoump3.viewModels.YouMp3Screen
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 import kotlin.math.roundToInt
 import org.jetbrains.compose.resources.painterResource
 
-/**
- * Ventana activa de la app. Se modela aparte de `YouMp3Screen` porque el arranque y los dos tipos
- * de error no son pantallas navegables: no se eligen, las impone el estado.
- */
-private enum class AppWindow { Init, Main, ConnectionError, ServiceError }
-
 @Composable
-fun YouMp3App(
-    dependencies: PlatformDependencies,
-    viewModel: YouMp3ViewModel
-) {
-    val api = remember(viewModel) {
-        dependencies.createApi { viewModel.settingsViewModel.effectiveServerUrl }
-    }
-    val songInputViewModel = viewModel { SongInputViewModel(api, dependencies.audioSaver, dependencies.audioPlayer) }
-    val errorStatusViewModel = viewModel<ErrorStatusViewModel>()
-    // rememberSaveable: en una rotación se pierde la composición pero no estos valores, así que la
-    // app no vuelve a lanzar el sondeo ni parpadea la pantalla de carga.
-    var appReady by rememberSaveable { mutableStateOf(false) }
-    var connectionError by rememberSaveable(stateSaver = AppErrorSaver) {
-        mutableStateOf<AppError?>(null)
-    }
+fun YouMp3App(viewModel: YouMp3ViewModel) {
+    val songInputViewModel = viewModel.songInputViewModel
+    val errorStatusViewModel = viewModel.errorStatusViewModel
     val themeColors = viewModel.settingsViewModel.currentColors
-    val serviceError = songInputViewModel.state.serviceError
-    val connectionCheckToken = viewModel.state.connectionCheckToken
-
-    LaunchedEffect(connectionCheckToken) {
-        if (connectionCheckToken > 0) {
-            songInputViewModel.onServiceErrorDismissed()
-            appReady = false
-            connectionError = null
-        }
-    }
-
-    // Un solo error activo: el de conexión tiene prioridad porque solo puede existir durante el
-    // arranque, antes de que haya una pantalla principal que pueda fallar.
-    val activeError = connectionError ?: serviceError
+    val activeError = viewModel.activeError
+    val activeWindow = viewModel.activeWindow
 
     LaunchedEffect(activeError) {
         if (activeError != null) {
@@ -109,13 +72,6 @@ fun YouMp3App(
 
     CompositionLocalProvider(LocalAppColors provides themeColors) {
         YouMp3Theme {
-            val activeWindow = when {
-                !appReady && connectionError == null -> AppWindow.Init
-                connectionError != null -> AppWindow.ConnectionError
-                serviceError != null -> AppWindow.ServiceError
-                else -> AppWindow.Main
-            }
-
             // Misma transición que la navegación interna para que cambiar de ventana no se note
             // como un salto: hacia delante si entra la app o un error, hacia atrás al recuperarse.
             AnimatedContent(
@@ -133,23 +89,18 @@ fun YouMp3App(
             ) { window ->
                 when (window) {
                     AppWindow.Init -> InitScreen(
-                        api = api,
-                        onConnected = { appReady = true },
-                        onError = { connectionError = it }
+                        api = viewModel.api,
+                        connectionCheckToken = viewModel.state.connectionCheckToken,
+                        onConnected = viewModel::onConnectionEstablished,
+                        onError = viewModel::onConnectionFailed
                     )
                     AppWindow.ConnectionError -> ErrorStatusScreen(
                         viewModel = errorStatusViewModel,
-                        onGoBackToHome = {
-                            connectionError = null
-                            viewModel.onRecheckConnection()
-                        }
+                        onGoBackToHome = viewModel::onRecheckConnection
                     )
                     AppWindow.ServiceError -> ErrorStatusScreen(
                         viewModel = errorStatusViewModel,
-                        onGoBackToHome = {
-                            songInputViewModel.onServiceErrorDismissed()
-                            viewModel.onReturnToHome()
-                        }
+                        onGoBackToHome = viewModel::onDismissServiceError
                     )
                     AppWindow.Main -> YouMp3Screen(
                         viewModel = viewModel,

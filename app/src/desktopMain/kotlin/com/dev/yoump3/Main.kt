@@ -32,7 +32,14 @@ private fun ProvideViewModelStoreOwner(content: @Composable () -> Unit) {
 
 fun main() = application {
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = {
+            // `exitApplication` mata el proceso sin pasar por `ViewModelStore.clear()`, así que sin
+            // este aviso `onCleared` no llega a correr y el `Clip` de sonido se queda abierto. Es el
+            // mismo hueco que en Android cubre el cierre de la app, aquí sin proceso intermedio que
+            // lo taponee.
+            AppBackgroundSignal.onAppBackgrounded()
+            exitApplication()
+        },
         title = "YouMp3"
     ) {
         ProvideViewModelStoreOwner {
@@ -43,11 +50,8 @@ fun main() = application {
                     appPreferences = DesktopAppPreferences()
                 )
             }
-            val viewModel = viewModel { YouMp3ViewModel(deps.appPreferences, deps.appConfig) }
-            YouMp3App(
-                dependencies = deps,
-                viewModel = viewModel
-            )
+            val viewModel = viewModel { YouMp3ViewModel(deps) }
+            YouMp3App(viewModel = viewModel)
         }
     }
 }

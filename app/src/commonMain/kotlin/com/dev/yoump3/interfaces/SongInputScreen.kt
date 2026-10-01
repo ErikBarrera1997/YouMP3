@@ -255,8 +255,7 @@ fun SongInputScreenContent(
                                 viewModel.onReturnToInput()
                             }
                         },
-                        onRetryDownload = null,
-                        onRetrySearch = viewModel::onRetrySearch
+                        onRetryExtraction = viewModel::onRetryExtraction
                     )
                 }
         }

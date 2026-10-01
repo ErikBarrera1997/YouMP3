@@ -18,6 +18,7 @@ class AndroidAudioPlayer : AudioPlayer {
     companion object {
         private const val PREVIEW_PREFIX = "yoump3_preview"
         private const val PREVIEW_SUFFIX = ".mp3"
+        private const val POLLING_JOIN_TIMEOUT_MS = 500L
 
         @Volatile
         var instance: AndroidAudioPlayer? = null
@@ -57,32 +58,56 @@ class AndroidAudioPlayer : AudioPlayer {
 
         release()
 
+        // `release()` retira la instancia estática, así que hay que volver a registrarse aquí: es
+        // lo que leen la notificación y sus botones para saber qué reproducir. Sin esto, una
+        // extracción posterior a haber salido de la app funcionaría pero dejaría la notificación
+        // inerte.
+        instance = this
         activeTitle = title
 
         val file = File.createTempFile(PREVIEW_PREFIX, PREVIEW_SUFFIX, appContext.cacheDir)
-        FileOutputStream(file).use { it.write(audio.bytes) }
         tempFile = file
+        try {
+            FileOutputStream(file).use { it.write(audio.bytes) }
+        } catch (e: Exception) {
+            // El temporal se registra antes de escribirlo, no después: si el write falla (ENOSPC,
+            // IOException) y lo registrásemos al final, el MP3 ya creado no lo referenciaría ningún
+            // campo y por tanto `release()` no podría borrarlo. Quedaría en `cacheDir` hasta el
+            // siguiente arranque, con `sweepStalePreviews` como única salida.
+            release()
+            throw e
+        }
         loadedAudio = audio
 
         val mp = MediaPlayer()
-        mp.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                .build()
-        )
-        mp.setDataSource(file.absolutePath)
-        mp.prepare()
-        mp.setOnCompletionListener {
-            stopPolling()
-            state.isPlaying = false
-            state.positionMs = 0L
-            stopForegroundNotification()
-        }
         player = mp
-        state.durationMs = mp.duration.toLong().coerceAtLeast(0L)
-        state.positionMs = 0L
-        state.isPlaying = false
+        try {
+            mp.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            mp.setDataSource(file.absolutePath)
+            mp.prepare()
+            mp.setOnCompletionListener {
+                stopPolling()
+                state.isPlaying = false
+                state.positionMs = 0L
+                stopForegroundNotification()
+            }
+            state.durationMs = mp.duration.toLong().coerceAtLeast(0L)
+            state.positionMs = 0L
+            state.isPlaying = false
+        } catch (e: Exception) {
+            // El `MediaPlayer` es un recurso nativo y solo quedaba alcanzable desde el campo
+            // `player`, así que un `setDataSource` o un `prepare` fallidos lo filtraban de forma
+            // permanente: el decoder nativo se acumulaba en el proceso sin que nada lo liberara.
+            // `release()` lo libera y borra el temporal, y la excepción sube para que la pantalla
+            // muestre el fallo de la extracción en vez de fingir que hay audio.
+            release()
+            throw e
+        }
 
         MediaPlayerService.start(appContext)
     }
@@ -136,6 +161,10 @@ class AndroidAudioPlayer : AudioPlayer {
         state.positionMs = 0L
         state.durationMs = 0L
         activeTitle = ""
+        // Se suelta la referencia estática para que el recolector pueda llevarse este reproductor si
+        // nada más lo apunta. La comprobación importa: si otra Activity ya creó un reproductor y
+        // `instance` es suyo, este `release()` no debe robarle el sitio.
+        if (instance === this) instance = null
         stopForegroundNotification()
     }
 
@@ -185,8 +214,19 @@ class AndroidAudioPlayer : AudioPlayer {
 
     private fun stopPolling() {
         running = false
-        updateThread?.interrupt()
+        val thread = updateThread ?: return
         updateThread = null
+        thread.interrupt()
+        // `MediaPlayer` no es thread-safe. Sin esta espera, el hilo de sondeo puede estar dentro de
+        // `currentPosition` mientras esta misma llamada hace `release()`, y eso no es una excepción
+        // que se pueda capturar en un `try`: es un acceso concurrente a un recurso nativo. El
+        // `interrupt` rompe el `sleep` de 200 ms, así que la espera es casi siempre inmediata; el
+        // plazo es solo para que un sondeo atascado en una llamada nativa no bloquee el hilo principal.
+        try {
+            thread.join(POLLING_JOIN_TIMEOUT_MS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 }
 

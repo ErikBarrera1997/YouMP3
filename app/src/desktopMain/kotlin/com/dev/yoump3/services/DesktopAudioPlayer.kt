@@ -104,8 +104,21 @@ class DesktopAudioPlayer : AudioPlayer {
 
     private fun stopPolling() {
         running = false
-        updateThread?.interrupt()
+        val thread = updateThread ?: return
         updateThread = null
+        thread.interrupt()
+        // El `Clip` tampoco es thread-safe: sin esta espera, el hilo de sondeo puede estar leyendo
+        // `microsecondPosition` mientras `release()` lo cierra. El plazo evita que un sondeo atascado
+        // bloquee el hilo de la UI.
+        try {
+            thread.join(POLLING_JOIN_TIMEOUT_MS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+    }
+
+    private companion object {
+        const val POLLING_JOIN_TIMEOUT_MS = 500L
     }
 }
 
