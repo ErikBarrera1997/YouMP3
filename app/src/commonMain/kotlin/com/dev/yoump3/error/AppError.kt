@@ -65,21 +65,14 @@ enum class AppErrorKind(
         title = "PETICIÓN NO VÁLIDA",
         detail = "El servicio recibió parámetros inválidos. Inténtalo de nuevo."
     ),
-    /**
-     * Solo llega desde la extracción: `AudioExtractionService` valida el `videoId` que el cliente
-     * manda junto al título. Es un resultado viejo o corrupto, no algo que se arregle reintentando.
-     */
+
     INVALID_VIDEO_ID(
         httpStatus = 400,
         backendMessage = "The video identifier is not valid. Try another result.",
         retryable = false,
         detail = "Ese resultado ya no es válido. Prueba con otro."
     ),
-    /**
-     * Prácticamente inalcanzable: el backend lo emite cuando el cliente corta la conexión, así que
-     * el cuerpo normalmente no llega. Se mapea igual para que el catálogo sea completo frente al
-     * contrato y, si llegara, signifique algo distinto a un rechazo de validación.
-     */
+
     CONNECTION_INTERRUPTED(
         httpStatus = 400,
         backendMessage = "Connection interrupted by the client.",
@@ -203,12 +196,7 @@ enum class AppErrorKind(
         severity = AppErrorSeverity.FULL_SCREEN,
         detail = "El servicio de extracción no está disponible ahora mismo. Inténtalo más tarde."
     ),
-    /**
-     * El backend responde 503 con este literal cuando yt-dlp sí está instalado pero no puede hablar
-     * con YouTube sin cookies de sesión. Rompe búsqueda y extracción por igual, y verificado contra
-     * el servicio desplegado, no es transitorio: reintentar no lo arregla, hay que reconfigurar el
-     * contenedor.
-     */
+
     YOUTUBE_SESSION_COOKIES_MISSING(
         httpStatus = 503,
         backendMessage = "The YouTube session cookies are not available on the server.",
@@ -216,10 +204,7 @@ enum class AppErrorKind(
         severity = AppErrorSeverity.FULL_SCREEN,
         detail = "El servidor no puede acceder a YouTube en este momento. Es un problema del servicio, no de tu búsqueda. Inténtalo más tarde."
     ),
-    /**
-     * YouTube bloquea las peticiones desde la IP del servidor. Es el motivo más probable de que
-     * cookies, PO token o proxy dejen de servir, y llega cuando las cookies ya están resueltas.
-     */
+
     YOUTUBE_BLOCKED(
         httpStatus = 503,
         backendMessage = "YouTube is blocking this request from our server. Try again later.",
@@ -267,26 +252,13 @@ enum class AppErrorKind(
         detail = "El servicio está fallando. Inténtalo más tarde."
     ),
 
-    // --- Respuesta de pasarela, no del backend: la instancia está levantándose ---
-    /**
-     * Lo decide lo que hay por delante del backend, no el backend. Cloudflare o el propio Render
-     * contestan 502/503/52x mientras levantan una instancia en reposo, y el cuerpo no es JSON del
-     * backend: [AppErrorCatalog.byStatusAndMessage] no casa y el error se decide solo por status.
-     *
-     * Antes ese caso caía en [EXTRACTION_FAILED] y el usuario leía "prueba otro resultado" en la
-     * pantalla de arranque, donde no hay ningún vídeo seleccionado.
-     *
-     * Sin [httpStatus] ni [backendMessage] a propósito: no es un literal del backend, solo un
-     * respaldo por status. Declararlos rompería los tests de invariante del catálogo.
-     */
     GATEWAY_UNAVAILABLE(
         retryable = true,
         severity = AppErrorSeverity.FULL_SCREEN,
         title = "SERVIDOR NO DISPONIBLE",
         detail = "El servidor no está respondiendo. Puede que esté arrancando; inténtalo en unos segundos."
     ),
-
-    // --- Fallos de transporte: nunca hubo respuesta HTTP ---
+    
     CLIENT_TIMEOUT(
         detail = "La conexión tardó demasiado. Inténtalo de nuevo."
     ),
@@ -397,7 +369,6 @@ object AppErrorCatalog {
         return byStatus[statusCode] ?: AppErrorKind.UNKNOWN
     }
 
-    /** Resuelve un fallo de transporte: no hubo respuesta HTTP, solo una excepción. */
     fun resolve(cause: Throwable): AppError = AppError(
         kind = classifyTransportError(cause),
         cause = cause

@@ -133,11 +133,16 @@ class YouMp3Api(
      * Decide si se puede entrar en la app. Solo devuelve success si el backend responde con el
      * rechazo esperado del sondeo, es decir, si está realmente sirviendo.
      *
-     * La API no expone endpoint raíz ni health check, así que se sondea
-     * `POST /api/audios/search` con un body vacío: el backend rechaza la petición con 400
-     * `Enter the name of a video to search on YouTube.` de inmediato, sin lanzar yt-dlp. Cualquier
-     * otra respuesta (500 genérico, 503, 404 por URL mal configurada, o el body por defecto de
-     * Spring) significa que el servicio no sirve, y se propaga como [ApiException] para que la
+     * La API sí expone `GET /api/health`, pero no se usa a propósito: devuelve 503 mientras falten
+     * las cookies de YouTube, así que usarlo como puerta de entrada bloquearía la app ante una
+     * condición recuperable en lugar de dejar entrar y mostrar el error donde ocurre.
+     *
+     * Por eso se sondea `POST /api/audios/search` con un body vacío. La validación de bean se
+     * ejecuta antes de tocar yt-dlp, así que el backend responde 400
+     * `Enter the name of a video to search on YouTube.` de inmediato y ese 400 se considera
+     * prueba de vida tanto si el servicio está sano como si está degradado por cookies ausentes.
+     * Cualquier otra respuesta (500 genérico, 404 por URL mal configurada, o el body por defecto
+     * de Spring) significa que el servicio no sirve, y se propaga como [ApiException] para que la
      * pantalla inicial muestre el error en lugar de avanzar.
      */
     suspend fun checkConnection(): Result<Unit> = try {
