@@ -2,9 +2,9 @@ name: Build & Test
 
 on:
   push:
-    branches: [master, alpha, Beta]
+    branches: [master, alpha, Beta, beta_server]
   pull_request:
-    branches: [master, alpha, Beta]
+    branches: [master, alpha, Beta, beta_server]
   workflow_dispatch:
 
 jobs:
