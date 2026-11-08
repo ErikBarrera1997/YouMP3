@@ -81,6 +81,14 @@ fun SongInputScreenContent(
         }
     }
 
+    if (state.showDataUsageConsent) {
+        DataUsageConsentDialog(
+            previouslyDeclined = state.dataUsageConsentDeclined,
+            onAccept = viewModel::onDataUsageConsentAccepted,
+            onDecline = viewModel::onDataUsageConsentDeclined
+        )
+    }
+
     Box(
         modifier = modifier
             .pointerInput(Unit) {

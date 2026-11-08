@@ -5,6 +5,7 @@ import android.content.Context
 private const val PREFS_NAME = "yoump3_prefs"
 private const val KEY_THEME_MODE = "theme_mode"
 private const val KEY_SERVER_URL = "server_url"
+private const val KEY_DATA_USAGE_CONSENT = "data_usage_consent"
 
 class AndroidAppPreferences(
     context: Context
@@ -29,5 +30,16 @@ class AndroidAppPreferences(
 
     override fun clearServerUrl() {
         prefs.edit().remove(KEY_SERVER_URL).apply()
+    }
+
+    override fun getDataUsageConsent(): Boolean? =
+        if (prefs.contains(KEY_DATA_USAGE_CONSENT)) {
+            prefs.getBoolean(KEY_DATA_USAGE_CONSENT, false)
+        } else {
+            null
+        }
+
+    override fun setDataUsageConsent(granted: Boolean) {
+        prefs.edit().putBoolean(KEY_DATA_USAGE_CONSENT, granted).apply()
     }
 }

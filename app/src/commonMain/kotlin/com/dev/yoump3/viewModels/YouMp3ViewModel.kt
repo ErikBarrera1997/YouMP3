@@ -58,7 +58,8 @@ class YouMp3ViewModel(
     val songInputViewModel = SongInputViewModel(
         api = api,
         audioSaver = dependencies.audioSaver,
-        audioPlayer = dependencies.audioPlayer
+        audioPlayer = dependencies.audioPlayer,
+        appPreferences = dependencies.appPreferences
     )
 
     val errorStatusViewModel = ErrorStatusViewModel()
@@ -113,6 +114,8 @@ class YouMp3ViewModel(
     }
 
     fun onSettingsClick() {
+        // El permiso pudo concederse o rechazarse desde el aviso de búsqueda.
+        settingsViewModel.refreshDataUsageConsent()
         state = state.copy(currentScreen = YouMp3Screen.Settings)
     }
 

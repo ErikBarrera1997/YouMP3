@@ -7,11 +7,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dev.yoump3.AppBackgroundSignal
 import com.dev.yoump3.appVersion
+import com.dev.yoump3.consent.DataUsageConsent
 import com.dev.yoump3.error.AppError
 import com.dev.yoump3.error.AppErrorCatalog
 import com.dev.yoump3.error.AppErrorKind
 import com.dev.yoump3.init.ApiException
 import com.dev.yoump3.init.YouMp3Api
+import com.dev.yoump3.preferences.AppPreferences
 import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
 import com.dev.yoump3.services.ExtractedAudio
@@ -49,13 +51,18 @@ data class SongInputUiState(
     val isDownloadFailed: Boolean = false,
     val downloadStatus: String? = null,
     val errorMessage: String? = null,
-    val serviceError: AppError? = null
+    val serviceError: AppError? = null,
+    // El aviso se muestra en la pantalla de búsqueda y bloquea el arranque de la petición.
+    val showDataUsageConsent: Boolean = false,
+    // Distingue "todavía no preguntado" de "rechazado", para explicar por qué sigue bloqueada.
+    val dataUsageConsentDeclined: Boolean = false
 )
 
 class SongInputViewModel(
     private val api: YouMp3Api,
     private val audioSaver: AudioSaver,
-    val audioPlayer: AudioPlayer
+    val audioPlayer: AudioPlayer,
+    private val appPreferences: AppPreferences
 ) : ViewModel() {
 
     /**
@@ -145,9 +152,53 @@ class SongInputViewModel(
     }
 
     fun onSearchClick() {
+        if (state.showDataUsageConsent) return
+
         val query = state.songQuery.trim()
         if (query.isEmpty()) return
 
+        when (appPreferences.getDataUsageConsent()) {
+            true -> startSearch(query)
+            null -> state = state.copy(
+                showDataUsageConsent = true,
+                dataUsageConsentDeclined = false
+            )
+            false -> state = state.copy(
+                showDataUsageConsent = true,
+                dataUsageConsentDeclined = true
+            )
+        }
+    }
+
+    /**
+     * El usuario concedió el permiso desde el aviso de la búsqueda. Se guarda para no volver a
+     * preguntar y, si había una búsqueda pendiente, se ejecuta ahora.
+     */
+    fun onDataUsageConsentAccepted() {
+        appPreferences.setDataUsageConsent(true)
+        val query = state.songQuery.trim()
+        state = state.copy(
+            showDataUsageConsent = false,
+            dataUsageConsentDeclined = false,
+            errorMessage = null
+        )
+        if (query.isNotEmpty()) startSearch(query)
+    }
+
+    /**
+     * El usuario rechazó el permiso. La decisión se persiste y la búsqueda queda bloqueada hasta
+     * que lo habilite desde Ajustes o acepte el aviso en un nuevo intento.
+     */
+    fun onDataUsageConsentDeclined() {
+        appPreferences.setDataUsageConsent(false)
+        state = state.copy(
+            showDataUsageConsent = false,
+            dataUsageConsentDeclined = true,
+            errorMessage = DataUsageConsent.BLOCKED_MESSAGE
+        )
+    }
+
+    private fun startSearch(query: String) {
         audioPlayer.stop()
         purgeExtractedAudio()
         state = clearExtractionState().copy(
@@ -160,7 +211,10 @@ class SongInputViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             try {
-                val response = api.searchSongs(query)
+                val response = api.searchSongs(
+                    videoName = query,
+                    dataUsageConsent = appPreferences.getDataUsageConsent()
+                )
                 state = state.copy(
                     isLoading = false,
                     searchResults = response.results.mapNotNull { result ->
@@ -275,7 +329,11 @@ class SongInputViewModel(
      * pico del `load` en lugar de solaparse solo con la decodificación.
      */
     private suspend fun extractAndDecode(videoId: String, title: String): ExtractionOutcome {
-        val response = api.extractAudio(videoName = state.lastSearchQuery, videoId = videoId)
+        val response = api.extractAudio(
+            videoName = state.lastSearchQuery,
+            videoId = videoId,
+            dataUsageConsent = appPreferences.getDataUsageConsent()
+        )
         return ExtractionOutcome(
             audio = ExtractedAudio(decodeBase64(response.audioBase64)),
             title = response.videoTitle ?: title,
@@ -341,7 +399,9 @@ class SongInputViewModel(
         resultFormat = null,
         resultSizeBytes = null,
         downloadStatus = null,
-        errorMessage = null
+        errorMessage = null,
+        showDataUsageConsent = false,
+        dataUsageConsentDeclined = false
     )
 
     fun onDownloadClick() {

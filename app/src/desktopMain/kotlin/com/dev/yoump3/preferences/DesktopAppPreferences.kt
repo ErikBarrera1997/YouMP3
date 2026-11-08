@@ -5,6 +5,7 @@ import java.util.prefs.Preferences
 private const val NODE_PATH = "com/dev/yoump3"
 private const val KEY_THEME_MODE = "theme_mode"
 private const val KEY_SERVER_URL = "server_url"
+private const val KEY_DATA_USAGE_CONSENT = "data_usage_consent"
 
 class DesktopAppPreferences : AppPreferences {
 
@@ -26,5 +27,12 @@ class DesktopAppPreferences : AppPreferences {
 
     override fun clearServerUrl() {
         prefs.remove(KEY_SERVER_URL)
+    }
+
+    override fun getDataUsageConsent(): Boolean? =
+        prefs.get(KEY_DATA_USAGE_CONSENT, null)?.toBooleanStrictOrNull()
+
+    override fun setDataUsageConsent(granted: Boolean) {
+        prefs.put(KEY_DATA_USAGE_CONSENT, granted.toString())
     }
 }

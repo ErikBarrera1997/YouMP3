@@ -20,7 +20,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
-data class AudioExtractionRequest(val videoName: String, val videoId: String? = null)
+data class AudioExtractionRequest(
+    val videoName: String,
+    val videoId: String? = null,
+    // Se envía el permiso persistido. Sin cookies no cambia nada en el backend, pero deja el
+    // contrato listo para cuando la app adjunte las cookies de la sesión.
+    val dataUsageConsent: Boolean? = null
+)
 
 @Serializable
 data class AudioExtractionResponse(
@@ -33,7 +39,10 @@ data class AudioExtractionResponse(
 )
 
 @Serializable
-data class AudioSearchRequest(val videoName: String)
+data class AudioSearchRequest(
+    val videoName: String,
+    val dataUsageConsent: Boolean? = null
+)
 
 /**
  * Extracción correcta. El tipo codifica la garantía: si este método devuelve, hay audio. Un
@@ -165,10 +174,13 @@ class YouMp3Api(
         Result.failure(ApiException(AppErrorCatalog.resolve(e)))
     }
 
-    suspend fun searchSongs(videoName: String): AudioSearchResponse {
+    suspend fun searchSongs(
+        videoName: String,
+        dataUsageConsent: Boolean? = null
+    ): AudioSearchResponse {
         val response = client.post(endpoint("/api/audios/search")) {
             contentType(ContentType.Application.Json)
-            setBody(AudioSearchRequest(videoName))
+            setBody(AudioSearchRequest(videoName, dataUsageConsent))
         }
         response.requireSuccess()
         val parsed = response.body<AudioSearchResponse>()
@@ -176,10 +188,14 @@ class YouMp3Api(
         return parsed
     }
 
-    suspend fun extractAudio(videoName: String, videoId: String? = null): ExtractedAudioResponse {
+    suspend fun extractAudio(
+        videoName: String,
+        videoId: String? = null,
+        dataUsageConsent: Boolean? = null
+    ): ExtractedAudioResponse {
         val response = client.post(endpoint("/api/audios/extract")) {
             contentType(ContentType.Application.Json)
-            setBody(AudioExtractionRequest(videoName, videoId))
+            setBody(AudioExtractionRequest(videoName, videoId, dataUsageConsent))
         }
         response.requireSuccess()
         val parsed = response.body<AudioExtractionResponse>()

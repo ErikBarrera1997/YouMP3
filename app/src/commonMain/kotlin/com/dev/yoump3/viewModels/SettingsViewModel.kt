@@ -26,7 +26,9 @@ data class SettingsUiState(
     val serverUrl: String = "",
     val committedServerUrl: String = "",
     val defaultServerUrl: String = "",
-    val serverUrlError: String? = null
+    val serverUrlError: String? = null,
+    val dataUsageConsent: Boolean = false,
+    val dataUsageConsentConfigured: Boolean = false
 ) {
     val isServerUrlDirty: Boolean
         get() = normalizeServerUrl(serverUrl) != committedServerUrl
@@ -56,7 +58,9 @@ class SettingsViewModel(
             themeMode = initialThemeMode(),
             serverUrl = initialServerUrl(),
             committedServerUrl = initialServerUrl(),
-            defaultServerUrl = defaultServerUrl
+            defaultServerUrl = defaultServerUrl,
+            dataUsageConsent = appPreferences.getDataUsageConsent() == true,
+            dataUsageConsentConfigured = appPreferences.getDataUsageConsent() != null
         )
     )
         private set
@@ -73,6 +77,26 @@ class SettingsViewModel(
     fun onThemeModeChange(mode: ThemeMode) {
         state = state.copy(themeMode = mode)
         appPreferences.setThemeMode(mode.name)
+    }
+
+    /**
+     * Relee el permiso de las preferencias. El aviso de la búsqueda y Ajustes son dos pantallas
+     * distintas y comparten el mismo valor persistido; al abrir Ajustes se refresca para no mostrar
+     * una decisión vieja.
+     */
+    fun refreshDataUsageConsent() {
+        state = state.copy(
+            dataUsageConsent = appPreferences.getDataUsageConsent() == true,
+            dataUsageConsentConfigured = appPreferences.getDataUsageConsent() != null
+        )
+    }
+
+    fun onDataUsageConsentChange(granted: Boolean) {
+        appPreferences.setDataUsageConsent(granted)
+        state = state.copy(
+            dataUsageConsent = granted,
+            dataUsageConsentConfigured = true
+        )
     }
 
     fun onServerUrlChange(value: String) {

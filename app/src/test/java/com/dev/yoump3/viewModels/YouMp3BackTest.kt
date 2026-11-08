@@ -109,6 +109,8 @@ class YouMp3BackTest {
             override fun getServerUrl(): String? = null
             override fun setServerUrl(url: String) = Unit
             override fun clearServerUrl() = Unit
+            override fun getDataUsageConsent(): Boolean? = null
+            override fun setDataUsageConsent(granted: Boolean) = Unit
         },
         audioPlayer = object : AudioPlayer {
             override val state = AudioPlayerState()

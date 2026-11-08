@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dev.yoump3.appVersion
+import com.dev.yoump3.consent.DataUsageConsent
 import com.dev.yoump3.generated.resources.Res
 import com.dev.yoump3.generated.resources.dark_theme
 import com.dev.yoump3.generated.resources.light_theme
@@ -173,6 +174,51 @@ fun SettingsScreenContent(
                     }
                 }
 
+                Spacer(Modifier.height(28.dp))
+
+                Text(
+                    text = "USO DE DATOS",
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(bottom = 14.dp, start = 4.dp)
+                )
+
+                ConsentOptionCard(
+                    enabled = settings.dataUsageConsent,
+                    configured = settings.dataUsageConsentConfigured,
+                    onClick = {
+                        settingsViewModel.onDataUsageConsentChange(!settings.dataUsageConsent)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(
+                    text = when {
+                        settings.dataUsageConsent -> DataUsageConsent.SETTINGS_ENABLED_STATUS
+                        settings.dataUsageConsentConfigured ->
+                            DataUsageConsent.SETTINGS_DISABLED_STATUS
+                        else -> DataUsageConsent.SETTINGS_NOT_CONFIGURED_STATUS
+                    },
+                    color = if (settings.dataUsageConsentConfigured && !settings.dataUsageConsent) {
+                        DestructiveText
+                    } else {
+                        SecondaryText
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    text = DataUsageConsent.SETTINGS_HELP,
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp)
+                )
+
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -240,6 +286,70 @@ private fun ThemeOptionCard(
         }
 
         RadioButtonIndicator(isSelected = isSelected)
+    }
+}
+
+@Composable
+private fun ConsentOptionCard(
+    enabled: Boolean,
+    configured: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(PanelBackground)
+            .border(1.dp, if (enabled) PrimaryText else BorderColor, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = DataUsageConsent.SETTINGS_TITLE,
+                color = PrimaryText,
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = when {
+                    enabled -> DataUsageConsent.SETTINGS_ENABLED_DESCRIPTION
+                    configured -> DataUsageConsent.SETTINGS_DISABLED_DESCRIPTION
+                    else -> DataUsageConsent.SETTINGS_NOT_CONFIGURED_DESCRIPTION
+                },
+                color = SecondaryText,
+                style = MaterialTheme.typography.labelMedium
+            )
+        }
+
+        Spacer(Modifier.width(16.dp))
+
+        ConsentToggleIndicator(enabled = enabled)
+    }
+}
+
+@Composable
+private fun ConsentToggleIndicator(
+    enabled: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = if (enabled) Alignment.CenterEnd else Alignment.CenterStart,
+        modifier = modifier
+            .size(width = 48.dp, height = 28.dp)
+            .clip(CircleShape)
+            .background(if (enabled) PrimaryText else Color.Transparent)
+            .border(2.dp, if (enabled) PrimaryText else SecondaryText, CircleShape)
+            .padding(3.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(CircleShape)
+                .background(if (enabled) AppBackground else SecondaryText)
+        )
     }
 }
 
