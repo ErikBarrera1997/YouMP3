@@ -158,5 +158,6 @@ class DataUsageConsentTest {
 
     private object FakeAppConfig : AppConfig {
         override val serverBaseUrl: String = "https://fake.test"
+        override val localServerBaseUrl: String = "http://127.0.0.1:8088"
     }
 }

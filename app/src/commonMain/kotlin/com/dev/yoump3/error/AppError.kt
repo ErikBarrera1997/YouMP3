@@ -63,7 +63,7 @@ enum class AppErrorKind(
         retryable = false,
         severity = AppErrorSeverity.FULL_SCREEN,
         title = "PETICIÓN NO VÁLIDA",
-        detail = "El servicio recibió parámetros inválidos. Inténtalo de nuevo."
+        detail = "Error al conectar con servidor. Inténtalo de nuevo."
     ),
 
     INVALID_VIDEO_ID(

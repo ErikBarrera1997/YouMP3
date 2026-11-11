@@ -1,5 +1,6 @@
 package com.dev.yoump3.interfaces
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,21 +20,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.dev.yoump3.appVersion
@@ -41,6 +42,7 @@ import com.dev.yoump3.consent.DataUsageConsent
 import com.dev.yoump3.generated.resources.Res
 import com.dev.yoump3.generated.resources.dark_theme
 import com.dev.yoump3.generated.resources.light_theme
+import com.dev.yoump3.viewModels.ServerTarget
 import com.dev.yoump3.viewModels.SettingsViewModel
 import com.dev.yoump3.viewModels.ThemeMode
 import org.jetbrains.compose.resources.painterResource
@@ -133,46 +135,30 @@ fun SettingsScreenContent(
                 )
 
                 val settings = settingsViewModel.state
-                val hasError = settings.serverUrlError != null
-                val showServerActions = settings.isServerUrlDirty || settings.hasServerUrlOverride
 
-                ServerUrlField(
-                    value = settings.serverUrl,
-                    onValueChange = settingsViewModel::onServerUrlChange,
-                    onDone = settingsViewModel::onServerUrlSave,
-                    isError = hasError,
+                ServerTargetDropdown(
+                    selected = settings.serverTarget,
+                    onSelect = settingsViewModel::onServerTargetChange,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(Modifier.height(10.dp))
 
                 Text(
-                    text = settings.serverUrlError
-                        ?: if (settings.hasServerUrlOverride) {
-                            "USANDO URL PERSONALIZADA"
-                        } else {
-                            "USANDO URL PREDETERMINADA"
-                        },
-                    color = if (hasError) DestructiveText else SecondaryText,
+                    text = settings.serverTarget.description,
+                    color = SecondaryText,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(start = 4.dp)
                 )
 
-                if (showServerActions) {
-                    Spacer(Modifier.height(16.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        SettingsActionButton(
-                            text = "GUARDAR",
-                            onClick = settingsViewModel::onServerUrlSave,
-                            isPrimary = true
-                        )
-                        SettingsActionButton(
-                            text = "RESTABLECER",
-                            onClick = settingsViewModel::onServerUrlReset,
-                            isPrimary = false
-                        )
-                    }
-                }
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    text = settings.serverUrl,
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(start = 4.dp)
+                )
 
                 Spacer(Modifier.height(28.dp))
 
@@ -354,71 +340,64 @@ private fun ConsentToggleIndicator(
 }
 
 @Composable
-private fun ServerUrlField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onDone: () -> Unit,
-    isError: Boolean,
+private fun ServerTargetDropdown(
+    selected: ServerTarget,
+    onSelect: (ServerTarget) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    BasicTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        cursorBrush = SolidColor(PrimaryText),
-        textStyle = MaterialTheme.typography.bodyMedium.merge(
-            TextStyle(color = PrimaryText)
-        ),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Uri,
-            imeAction = ImeAction.Done
-        ),
-        keyboardActions = KeyboardActions(onDone = { onDone() }),
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(PanelBackground)
-            .border(
-                1.dp,
-                if (isError) DestructiveText else BorderColor,
-                RoundedCornerShape(12.dp)
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(PanelBackground)
+                .border(1.dp, if (expanded) PrimaryText else BorderColor, RoundedCornerShape(12.dp))
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 18.dp, vertical = 16.dp)
+        ) {
+            Text(
+                text = selected.title,
+                color = PrimaryText,
+                style = MaterialTheme.typography.bodyMedium
             )
-            .padding(horizontal = 18.dp, vertical = 16.dp),
-        decorationBox = { innerTextField ->
-            Box(contentAlignment = Alignment.CenterStart) {
-                if (value.isEmpty()) {
-                    Text(
-                        text = "https://servidor.com",
-                        color = SecondaryText,
-                        style = MaterialTheme.typography.bodyMedium
+            Text(
+                text = if (expanded) "▴" else "▾",
+                color = SecondaryText,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier.fillMaxWidth(),
+            containerColor = PanelBackground,
+            tonalElevation = 0.dp,
+            shadowElevation = 4.dp,
+            border = BorderStroke(1.dp, BorderColor)
+        ) {
+            ServerTarget.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = option.title,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    },
+                    colors = MenuDefaults.itemColors(
+                        textColor = if (option == selected) PrimaryText else SecondaryText
                     )
-                }
-                innerTextField()
+                )
             }
         }
-    )
-}
-
-@Composable
-private fun SettingsActionButton(
-    text: String,
-    onClick: () -> Unit,
-    isPrimary: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (isPrimary) PrimaryText else Color.Transparent)
-            .border(1.dp, PrimaryText, RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 11.dp)
-    ) {
-        Text(
-            text = text,
-            color = if (isPrimary) AppBackground else PrimaryText,
-            style = MaterialTheme.typography.labelMedium
-        )
     }
 }
 

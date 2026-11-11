@@ -99,6 +99,7 @@ class YouMp3BackTest {
     private fun fakeDependencies() = PlatformDependencies(
         appConfig = object : AppConfig {
             override val serverBaseUrl: String = "https://fake.test"
+            override val localServerBaseUrl: String = "http://127.0.0.1:8088"
         },
         audioSaver = object : AudioSaver {
             override suspend fun save(fileName: String, contentType: String, audio: ByteArray): String = ""

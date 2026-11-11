@@ -69,14 +69,18 @@ val localProperties = Properties().apply {
         f.inputStream().use { load(it) }
     }
 }
+
+
+
 val serverBaseUrl: String = (
-    localProperties.getProperty("yoump3.serverUrl")
-        ?: providers.gradleProperty("YouMp3ServerUrl").get()
-        ?: error(
-            "No backend URL configured. Set 'YouMp3ServerUrl' in gradle.properties " +
-                "or 'yoump3.serverUrl' in local.properties."
-        )
+        localProperties.getProperty("yoump3.serverUrl")
+            ?: providers.gradleProperty("YouMp3ServerUrl").get()
     ).trimEnd('/')
+
+val localServerBaseUrl: String = (
+        localProperties.getProperty("yoump3.localServerUrl")
+            ?: providers.gradleProperty("YouMp3LocalServer").get()
+        ).trimEnd('/')
 
 android {
     namespace = "com.dev.yoump3"
@@ -92,6 +96,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "SERVER_BASE_URL", "\"$serverBaseUrl\"")
+        buildConfigField("String", "LOCAL_SERVER_BASE_URL", "\"$localServerBaseUrl\"")
     }
 
     signingConfigs {
@@ -181,7 +186,9 @@ val generateDesktopAppVersion = tasks.register("generateDesktopAppVersion") {
 val generateDesktopServerUrl = tasks.register("generateDesktopServerUrl") {
     val outputDir = layout.buildDirectory.dir("generated/desktopServerUrl")
     val serverUrl = serverBaseUrl
+    val localServerUrl = localServerBaseUrl
     inputs.property("serverUrl", serverUrl)
+    inputs.property("localServerUrl", localServerUrl)
     outputs.dir(outputDir)
     doLast {
         val file = outputDir.get().file("com/dev/yoump3/config/DesktopServerUrl.desktop.kt").asFile
@@ -191,6 +198,7 @@ val generateDesktopServerUrl = tasks.register("generateDesktopServerUrl") {
             |package com.dev.yoump3.config
             |
             |internal val defaultServerBaseUrl: String = "$serverUrl"
+            |internal val defaultLocalServerBaseUrl: String = "$localServerUrl"
             |""".trimMargin()
         )
     }

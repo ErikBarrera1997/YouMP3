@@ -21,44 +21,35 @@ enum class ThemeMode(
         get() = title
 }
 
+enum class ServerTarget(
+    val title: String,
+    val description: String
+) {
+    ONLINE("Servidor online", "API desplegada en la nube"),
+    LOCAL("Servidor local", "API en la red local");
+}
+
 data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.DARK,
+    val serverTarget: ServerTarget = ServerTarget.ONLINE,
     val serverUrl: String = "",
-    val committedServerUrl: String = "",
-    val defaultServerUrl: String = "",
-    val serverUrlError: String? = null,
     val dataUsageConsent: Boolean = false,
     val dataUsageConsentConfigured: Boolean = false
-) {
-    val isServerUrlDirty: Boolean
-        get() = normalizeServerUrl(serverUrl) != committedServerUrl
-
-    val hasServerUrlOverride: Boolean
-        get() = committedServerUrl != defaultServerUrl
-}
-
-private fun normalizeServerUrl(url: String): String = url.trim().trimEnd('/')
-
-private fun validateServerUrl(url: String): String? = when {
-    url.isEmpty() -> "ESCRIBE UNA URL"
-    !url.startsWith("http://") && !url.startsWith("https://") -> "DEBE EMPEZAR POR HTTP:// O HTTPS://"
-    url.any { it.isWhitespace() } -> "LA URL NO PUEDE CONTENER ESPACIOS"
-    else -> null
-}
+)
 
 class SettingsViewModel(
     private val appPreferences: AppPreferences,
     appConfig: AppConfig,
     private val onServerUrlCommitted: () -> Unit = {}
 ) : ViewModel() {
-    private val defaultServerUrl: String = appConfig.serverBaseUrl
+    private val onlineServerUrl: String = normalizeServerUrl(appConfig.serverBaseUrl)
+    private val localServerUrl: String = normalizeServerUrl(appConfig.localServerBaseUrl)
 
     var state by mutableStateOf(
         SettingsUiState(
             themeMode = initialThemeMode(),
+            serverTarget = initialServerTarget(),
             serverUrl = initialServerUrl(),
-            committedServerUrl = initialServerUrl(),
-            defaultServerUrl = defaultServerUrl,
             dataUsageConsent = appPreferences.getDataUsageConsent() == true,
             dataUsageConsentConfigured = appPreferences.getDataUsageConsent() != null
         )
@@ -72,7 +63,7 @@ class SettingsViewModel(
         }
 
     val effectiveServerUrl: String
-        get() = state.committedServerUrl
+        get() = state.serverUrl
 
     fun onThemeModeChange(mode: ThemeMode) {
         state = state.copy(themeMode = mode)
@@ -99,37 +90,29 @@ class SettingsViewModel(
         )
     }
 
-    fun onServerUrlChange(value: String) {
-        state = state.copy(serverUrl = value, serverUrlError = null)
+    fun onServerTargetChange(target: ServerTarget) {
+        if (target == state.serverTarget) return
+        commitServerTarget(target)
     }
 
-    fun onServerUrlSave() {
-        val normalized = normalizeServerUrl(state.serverUrl)
-        val error = validateServerUrl(normalized)
-        if (error != null) {
-            state = state.copy(serverUrlError = error)
-            return
-        }
-        commitServerUrl(normalized)
-    }
-
-    fun onServerUrlReset() {
-        commitServerUrl(state.defaultServerUrl)
-    }
-
-    private fun commitServerUrl(url: String) {
-        val changed = url != state.committedServerUrl
-        if (url == state.defaultServerUrl) {
+    private fun commitServerTarget(target: ServerTarget) {
+        val url = urlFor(target)
+        val changed = url != state.serverUrl
+        if (target == ServerTarget.ONLINE) {
             appPreferences.clearServerUrl()
         } else {
             appPreferences.setServerUrl(url)
         }
         state = state.copy(
-            serverUrl = url,
-            committedServerUrl = url,
-            serverUrlError = null
+            serverTarget = target,
+            serverUrl = url
         )
         if (changed) onServerUrlCommitted()
+    }
+
+    private fun urlFor(target: ServerTarget): String = when (target) {
+        ServerTarget.ONLINE -> onlineServerUrl
+        ServerTarget.LOCAL -> localServerUrl
     }
 
     private fun initialThemeMode(): ThemeMode {
@@ -137,6 +120,12 @@ class SettingsViewModel(
         return runCatching { ThemeMode.valueOf(stored) }.getOrNull() ?: ThemeMode.DARK
     }
 
-    private fun initialServerUrl(): String =
-        appPreferences.getServerUrl() ?: defaultServerUrl
+    private fun initialServerTarget(): ServerTarget {
+        val stored = appPreferences.getServerUrl()?.let(::normalizeServerUrl)
+        return if (stored == localServerUrl) ServerTarget.LOCAL else ServerTarget.ONLINE
+    }
+
+    private fun initialServerUrl(): String = urlFor(initialServerTarget())
 }
+
+private fun normalizeServerUrl(url: String): String = url.trim().trimEnd('/')
