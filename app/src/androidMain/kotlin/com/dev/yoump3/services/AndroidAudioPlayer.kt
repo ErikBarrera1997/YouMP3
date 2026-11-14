@@ -109,7 +109,9 @@ class AndroidAudioPlayer : AudioPlayer {
             throw e
         }
 
-        MediaPlayerService.start(appContext)
+        // El servicio de reproducción se arranca en `toggle()`, no aquí. `load` puede ejecutarse
+        // cuando la extracción termina en segundo plano, y Android 12+ no permite arrancar un FGS
+        // desde ese estado. El usuario siempre pulsa play desde la app visible.
     }
 
     override fun toggle() {
@@ -178,7 +180,12 @@ class AndroidAudioPlayer : AudioPlayer {
                     .notify(MediaPlayerService.NOTIFICATION_ID, MediaPlayerService.buildNotification(appContext))
             }
         } else if (state.isPlaying) {
-            MediaPlayerService.start(appContext)
+            try {
+                MediaPlayerService.start(appContext)
+            } catch (_: Exception) {
+                // Si Android no permite arrancar el FGS, el audio sigue sonando mientras la app
+                // esté visible. Es preferible a tumbar la reproducción por la notificación.
+            }
         }
     }
 

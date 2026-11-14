@@ -7,6 +7,7 @@ import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioPlayerState
 import com.dev.yoump3.services.AudioSaver
 import com.dev.yoump3.services.ExtractedAudio
+import com.dev.yoump3.services.NoOpExtractionNotifier
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -115,7 +116,8 @@ class DataUsageConsentTest {
                 override fun stop() = Unit
                 override fun release() = Unit
             },
-            appPreferences = preferences
+            appPreferences = preferences,
+            extractionNotifier = NoOpExtractionNotifier
         )
         return Harness(preferences, api, viewModel)
     }

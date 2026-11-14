@@ -59,7 +59,8 @@ class YouMp3ViewModel(
         api = api,
         audioSaver = dependencies.audioSaver,
         audioPlayer = dependencies.audioPlayer,
-        appPreferences = dependencies.appPreferences
+        appPreferences = dependencies.appPreferences,
+        extractionNotifier = dependencies.extractionNotifier
     )
 
     val errorStatusViewModel = ErrorStatusViewModel()
@@ -165,8 +166,14 @@ class YouMp3ViewModel(
         AppWindow.Init -> false
         AppWindow.Main -> when (state.currentScreen) {
             YouMp3Screen.SongInput -> {
-                onCloseSongInputClick()
-                true
+                // La pantalla de búsqueda decide primero: cancelar la extracción o volver de la
+                // tarjeta a los resultados. Solo si no hay nada que consumir se navega a Home.
+                if (songInputViewModel.onBackFromSongInput()) {
+                    true
+                } else {
+                    onCloseSongInputClick()
+                    true
+                }
             }
             YouMp3Screen.Settings -> {
                 onCloseSettingsClick()

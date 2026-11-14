@@ -17,6 +17,7 @@ import com.dev.yoump3.preferences.AppPreferences
 import com.dev.yoump3.services.AudioPlayer
 import com.dev.yoump3.services.AudioSaver
 import com.dev.yoump3.services.ExtractedAudio
+import com.dev.yoump3.services.ExtractionNotifier
 import com.dev.yoump3.services.decodeBase64
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Job
@@ -62,7 +63,8 @@ class SongInputViewModel(
     private val api: YouMp3Api,
     private val audioSaver: AudioSaver,
     val audioPlayer: AudioPlayer,
-    private val appPreferences: AppPreferences
+    private val appPreferences: AppPreferences,
+    private val extractionNotifier: ExtractionNotifier
 ) : ViewModel() {
 
     /**
@@ -96,6 +98,9 @@ class SongInputViewModel(
     fun dispose() {
         AppBackgroundSignal.remove(backgroundListener)
         cancelInFlightRequests()
+        // `cancelInFlightRequests` ya la retira si había extracción; el stop explícito cubre el
+        // caso de que el servicio haya quedado vivo sin job (por ejemplo, tras un fallo raro).
+        extractionNotifier.stop()
         purgeExtractedAudio()
     }
 
@@ -105,28 +110,25 @@ class SongInputViewModel(
     }
 
     /**
-     * Suelta la extracción al salir de la app, que es justo cuando el proceso pasa a ser ajusticible.
+     * Suelta memoria al pasar a segundo plano, pero ya no cancela la extracción.
      *
-     * Con la música en marcha no se toca nada: hay un servicio en primer plano sosteniendo el proceso
-     * a propósito, y ni la reproducción ni una extracción que va a terminar en unos segundos son
-     * memoria que sobre. Liberar ahí sería cortarle al usuario la canción que se fue a escuchar.
+     * La extracción en curso la sostiene un servicio en primer plano, así que el proceso no es
+     * ajusticible mientras dura: cancelarla aquí era justo lo que devolvía al usuario a la lista de
+     * resultados al volver. Cuando termina, el notificador publica el aviso si la app sigue en
+     * segundo plano.
      *
-     * Una extracción en curso es el peor caso: sostiene a la vez la cadena de base64 y el buffer
-     * decodificado. Se corta en lugar de dejarla rematar sola en un proceso que el sistema ya puede
-     * matar, y el usuario vuelve a los resultados para reintentarla si quiere. Si ya había audio
-     * cargado, también se suelta, porque la tarjeta y su botón de descarga leen de ese mismo buffer.
+     * Con la música en marcha no se toca nada: hay otro servicio en primer plano sosteniendo el
+     * proceso a propósito. Si ya hay una extracción terminada y sin reproducir, se suelta para no
+     * conservar el buffer decodificado mientras la app no se usa. La descarga se respeta aunque no
+     * haya reproducción: está escribiendo ese mismo buffer a disco y limpiarlo a mitad corrompería
+     * el archivo.
      */
     private fun onAppBackgrounded() {
         if (audioPlayer.state.isPlaying) return
-
-        if (state.isExtracting) {
-            cancelInFlightRequests()
-            purgeExtractedAudio()
-            state = clearExtractionState()
-            return
-        }
-
+        if (state.isExtracting) return
+        if (state.isDownloading) return
         if (!state.hasExtraction) return
+
         purgeExtractedAudio()
         state = clearExtractionState()
     }
@@ -135,6 +137,10 @@ class SongInputViewModel(
 
     private var searchJob: Job? = null
     private var extractionJob: Job? = null
+
+    // Cada extracción tiene su generación. Sin esto, el `finally` de una extracción cancelada
+    // podría cerrar la notificación de la extracción que el usuario acaba de iniciar.
+    private var extractionGeneration = 0
 
     private var extractedAudio: ExtractedAudio? = null
 
@@ -250,6 +256,10 @@ class SongInputViewModel(
     }
 
     fun onSelectResult(videoId: String, title: String) {
+        // Si venía sonando otra canción, se suelta antes de abrir el servicio de extracción: dos
+        // notificaciones en primer plano a la vez solo confunden y no hay razón para mantener el
+        // audio anterior mientras se extrae el nuevo.
+        purgeExtractedAudio()
         state = clearExtractionState().copy(
             isExtracting = true,
             selectedTitle = title,
@@ -279,11 +289,18 @@ class SongInputViewModel(
     }
 
     private fun runExtraction(videoId: String, title: String) {
+        val generation = ++extractionGeneration
+        // El aviso se arranca antes de la petición para que el proceso ya esté sostenido cuando la
+        // app pase a segundo plano. La acción de cancelar de la notificación reutiliza el mismo
+        // camino que el botón de la pantalla, para que el estado no se quede a medias.
+        extractionNotifier.start(title) { onCancelExtraction() }
+
         extractionJob = viewModelScope.launch {
             // El buffer decodificado todavía no es del ViewModel: solo pasa a serlo después de que
             // `load` lo acepte. `wipe` en el `finally` cubre ese hueco, para que un fallo de
             // reproducción no deje el MP3 en el heap hasta que pase el recolector.
             var audio: ExtractedAudio? = null
+            var success = false
             try {
                 val outcome = extractAndDecode(videoId, title)
                 audio = outcome.audio
@@ -299,6 +316,7 @@ class SongInputViewModel(
                     resultSizeBytes = outcome.audio.sizeBytes,
                     hasExtraction = true
                 )
+                success = true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -316,7 +334,12 @@ class SongInputViewModel(
                 }
             } finally {
                 audio?.wipe()
-                extractionJob = null
+                // Solo la extracción vigente cierra su notificación. Una cancelada ya la retiró
+                // `cancelInFlightRequests`, y una reemplazada tiene otra generación.
+                if (generation == extractionGeneration) {
+                    extractionJob = null
+                    extractionNotifier.finish(title, success)
+                }
             }
         }
     }
@@ -347,6 +370,25 @@ class SongInputViewModel(
         state = clearExtractionState()
     }
 
+    /**
+     * Decisión única del back dentro de la pantalla de búsqueda, para que el botón en pantalla y el
+     * back del sistema no hagan cosas distintas.
+     *
+     * Devuelve `true` si consumió el back (canceló la extracción o volvió de la tarjeta a los
+     * resultados) y `false` si el padre debe navegar a Home.
+     */
+    fun onBackFromSongInput(): Boolean = when {
+        state.isExtracting -> {
+            onCancelExtraction()
+            true
+        }
+        state.resultTitle != null && state.searchResults.isNotEmpty() -> {
+            onReturnToResults()
+            true
+        }
+        else -> false
+    }
+
     fun onServiceErrorDismissed() {
         cancelInFlightRequests()
         purgeExtractedAudio()
@@ -370,7 +412,16 @@ class SongInputViewModel(
     }
 
     private fun cancelInFlightRequests() {
-        if (!state.isExtracting && extractionJob == null && searchJob == null) return
+        val hadExtraction = extractionJob != null || state.isExtracting
+        if (!hadExtraction && searchJob == null) return
+
+        if (hadExtraction) {
+            // Invalida el `finally` de la extracción cancelada para que no cierre la notificación de
+            // una extracción posterior, y retira el aviso de progreso.
+            extractionGeneration++
+            extractionNotifier.stop()
+        }
+
         searchJob?.cancel()
         searchJob = null
         extractionJob?.cancel()

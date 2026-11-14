@@ -182,6 +182,17 @@ fun ExtractionStatusView(
                 )
             }
 
+            if (!isFailed) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Puedes salir de la app: la extracción continuará.",
+                    color = SecondaryText,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             if (isFailed) {
                 message?.let {
                     Spacer(Modifier.height(12.dp))

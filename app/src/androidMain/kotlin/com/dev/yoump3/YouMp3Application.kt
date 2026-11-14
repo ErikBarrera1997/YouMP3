@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Bundle
 import com.dev.yoump3.services.AndroidAudioPlayer
+import com.dev.yoump3.services.ExtractionService
 
 class YouMp3Application : Application() {
 
@@ -12,6 +13,8 @@ class YouMp3Application : Application() {
         super.onCreate()
         appContext = applicationContext
         AndroidAudioPlayer.sweepStalePreviews(applicationContext)
+        // Un proceso que murió con una extracción en curso puede dejar su notificación huérfana.
+        ExtractionService.cleanupStale(applicationContext)
         registerActivityLifecycleCallbacks(AppBackgroundWatcher())
     }
 
@@ -27,10 +30,15 @@ class YouMp3Application : Application() {
 
         override fun onActivityStarted(activity: Activity) {
             visible++
+            AppVisibility.update(visible)
+            // El aviso de resultado solo sirve mientras el usuario está fuera. Al volver, el
+            // resultado ya está en pantalla y la notificación sobra.
+            ExtractionService.dismissFinished(activity.applicationContext)
         }
 
         override fun onActivityStopped(activity: Activity) {
             visible = (visible - 1).coerceAtLeast(0)
+            AppVisibility.update(visible)
             if (visible == 0) AppBackgroundSignal.onAppBackgrounded()
         }
 
@@ -43,5 +51,21 @@ class YouMp3Application : Application() {
 
     companion object {
         lateinit var appContext: Context
+    }
+}
+
+/**
+ * Visibilidad de la app para las piezas que no viven en una Activity.
+ *
+ * El notificador la consulta al terminar la extracción: si el usuario ya está dentro de la app no
+ * tiene sentido publicar una notificación de "completado".
+ */
+object AppVisibility {
+    @Volatile
+    var isInForeground: Boolean = false
+        private set
+
+    fun update(visibleActivities: Int) {
+        isInForeground = visibleActivities > 0
     }
 }

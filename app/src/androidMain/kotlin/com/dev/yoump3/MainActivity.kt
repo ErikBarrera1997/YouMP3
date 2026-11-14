@@ -18,6 +18,7 @@ import com.dev.yoump3.dependencies.PlatformDependencies
 import com.dev.yoump3.interfaces.YouMp3App
 import com.dev.yoump3.preferences.AndroidAppPreferences
 import com.dev.yoump3.services.AndroidAudioSaver
+import com.dev.yoump3.services.AndroidExtractionNotifier
 import com.dev.yoump3.viewModels.YouMp3ViewModel
 
 class MainActivity : ComponentActivity() {
@@ -25,7 +26,8 @@ class MainActivity : ComponentActivity() {
         PlatformDependencies(
             appConfig = AndroidAppConfig(),
             audioSaver = AndroidAudioSaver(applicationContext),
-            appPreferences = AndroidAppPreferences(applicationContext)
+            appPreferences = AndroidAppPreferences(applicationContext),
+            extractionNotifier = AndroidExtractionNotifier(applicationContext)
         )
     }
 

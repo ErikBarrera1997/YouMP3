@@ -100,20 +100,8 @@ fun SongInputScreenContent(
     ) {
         BackButton(
             onClick = {
-                when {
-                    state.isExtracting -> {
-                        viewModel.onCancelExtraction()
-                        if (state.searchResults.isNotEmpty()) {
-                            viewModel.onReturnToResults()
-                        } else {
-                            viewModel.onReturnToInput()
-                        }
-                    }
-                    state.resultTitle != null && state.searchResults.isNotEmpty() -> {
-                        viewModel.onReturnToResults()
-                    }
-                    else -> onCloseClick()
-                }
+                // Misma decisión que el back del sistema, para que ambos botones no divergan.
+                if (!viewModel.onBackFromSongInput()) onCloseClick()
             },
             modifier = Modifier.align(Alignment.TopStart)
         )

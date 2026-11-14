@@ -1,0 +1,239 @@
+# YouMp3 — Mapa de estructura, funcionalidades y relación de clases/archivos
+# Formato machine-readable. Ver docs/ARQUITECTURA.md para la narrativa completa.
+
+project:
+  name: YouMp3
+  type: Kotlin Multiplatform (Compose Multiplatform)
+  module: ":app"
+  package_root: com.dev.yoump3
+  targets: [androidMain, desktopMain]
+  shared_source_set: commonMain
+  toolchain:
+    gradle: "8.13"
+    agp: "8.11.0"
+    kotlin: "2.3.x"
+    compose_multiplatform: "1.10.x"
+    key_libraries: [ktor-client-3.0.3, kotlinx-serialization-json, androidx-lifecycle-viewmodel]
+
+estructura:
+  raiz:
+    - {path: build.gradle.kts,        rol: plugins y configuración global}
+    - {path: settings.gradle.kts,     rol: "rootProject YouMp3; incluye :app"}
+    - {path: gradle.properties,       rol: "YouMp3Version (única fuente de versión), YouMp3ServerUrl"}
+    - {path: qodana.yaml,             rol: análisis de calidad (CI Qodana)}
+    - {path: AGENTS.md,               rol: guía de contribución/agentes}
+    - {path: .github/workflows/test_build.yaml,        rol: "CI: assembleRelease → lintRelease → compileKotlinDesktop → check"}
+    - {path: .github/workflows/qodana_code_quality.yml, rol: análisis estático}
+    - {path: app/build.gradle.kts,    rol: "config KMP + tareas generateDesktopAppVersion / generateDesktopServerUrl"}
+  codigo_generado:
+    - {tarea: generateDesktopAppVersion, archivo: build/generated/.../AppVersion.desktop.kt, declara: "actual val appVersion"}
+    - {tarea: generateDesktopServerUrl,  archivo: build/generated/.../config/DesktopServerUrl.desktop.kt, declara: defaultServerBaseUrl}
+    - regla: no editar a mano; cambiar gradle.properties o la tarea Gradle
+
+funcionalidades:
+  - id: verificacion_conexion
+    descripcion: sonda POST /api/audios/search con body vacío al arrancar; ventana Init mientras, ConnectionError si falla
+    clases: [YouMp3Api, YouMp3ViewModel, LoadingScreen, ErrorStatusScreen]
+  - id: busqueda_canciones
+    descripcion: búsqueda por título/artista; listado de resultados con videoId/título/autor/duración
+    clases: [SongInputViewModel, SongInputScreen, YouMp3Api, SearchResultUi]
+  - id: consentimiento_datos
+    descripcion: diálogo previo a la primera búsqueda; null/no preguntado vs concedido/denegado; persistido; bloquea búsqueda si denegado
+    clases: [DataUsageConsentDialog, DataUsageConsent, AppPreferences, SongInputViewModel, SettingsViewModel]
+  - id: extraccion_audio
+    descripcion: POST /api/audios/extract devuelve MP3 en base64; decodificación única fuera del hilo de UI; presupuesto máximo de tamaño
+    clases: [YouMp3Api, decodeBase64, ExtractedAudio, SongInputViewModel]
+  - id: reproduccion
+    descripcion: mini-player play/pause/seek sobre AudioPlayer.state; liberación al salir de pantalla o a segundo plano
+    clases: [MiniPlayer, ExtractionStatusView, AudioPlayer, AudioPlayerState, AndroidAudioPlayer, DesktopAudioPlayer, MediaPlayerService, AppBackgroundSignal]
+  - id: guardado_descarga
+    descripcion: guardar MP3 (MediaStore/Downloads o FileSystem) y abrir destino vía DownloadLink
+    clases: [AudioSaver, AndroidAudioSaver, DesktopAudioSaver, DownloadLink]
+  - id: ajustes
+    descripcion: tema oscuro/claro, servidor online/local con URL editable (re-valida conexión al confirmar), toggle de consentimiento
+    clases: [SettingsViewModel, SettingsScreenContent, ThemeMode, ServerTarget, YouMp3Colors, AppConfig]
+  - id: navegacion_back
+    descripcion: ventanas impuestas por estado (Init/Main/ConnectionError/ServiceError) + navegación interna Home/SongInput/Settings
+    clases: [YouMp3ViewModel, AppWindow, YouMp3Screen, YouMp3App]
+  - id: errores_tipificados
+    descripcion: catálogo de kinds con severidad/título/detalle; clasificación HTTP y de transporte; composables no interpretan códigos
+    clases: [AppError, AppErrorKind, AppErrorSeverity, AppErrorCatalog, ApiException, ErrorStatusViewModel]
+
+clases:
+  # ---------- commonMain: dominio compartido ----------
+  YouMp3ViewModel:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/viewModels/YouMp3ViewModel.kt
+    tipo: class extends ViewModel
+    rol: fuente de verdad; dueño de AppWindow, navegación y ViewModels hijos
+    depende_de: [PlatformDependencies, SettingsViewModel, SongInputViewModel, ErrorStatusViewModel, YouMp3Api]
+    expone: [YouMp3UiState, activeWindow]
+    ciclo_vida: onCleared() propaga songInputViewModel.dispose() y api.close()
+  SettingsViewModel:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/viewModels/SettingsViewModel.kt
+    tipo: class extends ViewModel
+    rol: tema, servidor (online/local/URL custom) y consentimiento
+    depende_de: [AppPreferences, AppConfig]
+    expone: [SettingsUiState, currentColors: YouMp3Colors, effectiveServerUrl]
+    callback: "onServerUrlCommitted -> re-check de conexión (lo inyecta YouMp3ViewModel)"
+  SongInputViewModel:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/viewModels/SongInputViewModel.kt
+    tipo: class extends ViewModel
+    rol: orquesta búsqueda -> extracción -> reproducción -> guardado
+    depende_de: [YouMp3Api, AudioSaver, AudioPlayer, AppPreferences, decodeBase64, DataUsageConsent, AppBackgroundSignal, AppErrorCatalog]
+    expone: [SongInputUiState, SearchResultUi]
+    produce: ExtractedAudio
+  ErrorStatusViewModel:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/viewModels/ErrorStatusViewModel.kt
+    tipo: class extends ViewModel
+    rol: muestra textos ya resueltos de AppError
+    depende_de: [AppError, AppErrorKind]
+    expone: ErrorStatusUiState
+  PlatformDependencies:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/dependencies/PlatformDependencies.kt
+    tipo: data class
+    rol: costura única de DI; construida por cada plataforma y por los tests con fakes
+    campos: [AppConfig, AudioSaver, AppPreferences, audioPlayer=inyectable(createAudioPlayer)]
+    fabrica: "createApi(baseUrl: () -> String): YouMp3Api"
+  YouMp3Api:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/init/YouMp3Api.kt
+    tipo: class
+    rol: cliente Ktor; checkConnection/searchSongs/extractAudio/close
+    endpoint_base_url: "lambda por petición (refleja ajustes de servidor sin reconstruir el API)"
+    endpoints: ["POST /api/audios/search", "POST /api/audios/extract"]
+    dtos: [AudioExtractionRequest, AudioExtractionResponse, AudioSearchRequest, AudioSearchResponse, ExtractedAudioResponse, AudioSearchResult]
+    lanza: ApiException(AppError)
+    usa: [AppErrorCatalog]
+  AppError:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/error/AppError.kt
+    tipo: data class + enums AppErrorKind/AppErrorSeverity + object AppErrorCatalog
+    rol: modelo de error con textos resueltos; catalog clasifica HTTP y transporte
+  AudioPlayer:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/services/AudioPlayer.kt
+    tipo: interface + AudioPlayerState + expect fun createAudioPlayer()
+    metodos: [load(ExtractedAudio), toggle, seekTo, stop, release]
+    implementaciones: [AndroidAudioPlayer, DesktopAudioPlayer]
+  AudioSaver:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/services/AudioSaver.kt
+    tipo: interface
+    implementaciones: [AndroidAudioSaver, DesktopAudioSaver]
+  ExtractedAudio:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/services/ExtractedAudio.kt
+    tipo: class
+    rol: única copia en memoria del audio extraído; wipe() la borra al salir
+  Base64Codec:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/services/Base64Codec.kt
+    tipo: expect suspend fun decodeBase64
+    rol: decodificación fuera del hilo de UI (evita OOM)
+    implementaciones: [Base64Codec.android.kt, Base64Codec.desktop.kt]
+  AppConfig:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/config/AppConfig.kt
+    tipo: "interface {serverBaseUrl, localServerBaseUrl}"
+    implementaciones: [AndroidAppConfig, DesktopAppConfig]
+  AppPreferences:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/preferences/AppPreferences.kt
+    tipo: "interface {theme, serverUrl, dataUsageConsent tri-state}"
+    implementaciones: [AndroidAppPreferences, DesktopAppPreferences]
+  AppBackgroundSignal:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/AppBackgroundSignal.kt
+    tipo: object + fun interface Listener
+    rol: señal común de paso a segundo plano; la alimenta cada plataforma
+    productores: [YouMp3Application (Android), Main.kt onCloseRequest (Desktop)]
+    consumidores: [SongInputViewModel]
+  DataUsageConsent:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/consent/DataUsageConsent.kt
+    tipo: object (constantes + VERSION)
+    rol: texto/claves del permiso de datos y cookies
+  DownloadLink:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/DownloadLink.kt
+    tipo: expect @Composable fun
+    implementaciones: [DownloadLink.android.kt (Intent), DownloadLink.desktop.kt (Browser)]
+  appVersion:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/AppVersion.kt
+    tipo: expect val
+    implementaciones: [AppVersion.android.kt (BuildConfig), AppVersion.desktop.kt (generado)]
+  # ---------- commonMain: UI (interfaces/) ----------
+  YouMp3App:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/YouMp3App.kt
+    tipo: "@Composable fun"
+    rol: router por viewModel.activeWindow; contiene YouMp3Screen
+    consume: [YouMp3ViewModel, LoadingScreen, ErrorStatusScreen, SongInputScreen, SettingsScreenContent, SonicCascadeBackground]
+  SongInputScreen:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/SongInputScreen.kt
+    consume: SongInputViewModel
+    hijos: [SearchStatusView, ExtractionStatusView, MiniPlayer, DataUsageConsentDialog, DownloadLink]
+  SettingsScreenContent:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/SettingsScreen.kt
+    consume: SettingsViewModel
+    usa: [ThemeColors (YouMp3Colors/LocalAppColors), ThemeMode, ServerTarget, DataUsageConsent]
+  ErrorStatusScreen:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/ErrorStatusScreen.kt
+    consume: ErrorStatusViewModel
+  ThemeColors:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/ThemeColors.kt
+    tipo: "data class YouMp3Colors + DarkThemeColors/LightThemeColors + LocalAppColors"
+  SonicCascadeBackground:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/interfaces/SonicCascadeBackground.kt
+    rol: fondo animado tematizado
+  LoadingScreen:
+    archivo: app/src/commonMain/kotlin/com/dev/yoump3/init/LoadingScreen.kt
+    rol: ventana Init durante checkConnection
+
+  # ---------- androidMain ----------
+  MainActivity:
+    archivo: app/src/androidMain/kotlin/com/dev/yoump3/MainActivity.kt
+    rol: setContent + back handler delegando a YouMp3ViewModel
+    construye: PlatformDependencies(AndroidAppConfig, AndroidAudioSaver, AndroidAppPreferences)
+  YouMp3Application:
+    archivo: app/src/androidMain/kotlin/com/dev/yoump3/YouMp3Application.kt
+    rol: cuenta Activities visibles -> dispara AppBackgroundSignal
+  AndroidAudioPlayer: {archivo: .../services/AndroidAudioPlayer.kt, implements: AudioPlayer, mecanica: MediaPlayer}
+  MediaPlayerService: {archivo: .../services/MediaPlayerService.kt, rol: Service de reproducción Android}
+  AndroidAudioSaver:  {archivo: .../services/AndroidAudioSaver.kt, implements: AudioSaver, mecanica: MediaStore}
+  AndroidAppPreferences: {archivo: .../preferences/AndroidAppPreferences.kt, implements: AppPreferences, mecanica: SharedPreferences}
+  AndroidAppConfig: {archivo: .../config/AndroidAppConfig.kt, implements: AppConfig, fuente: BuildConfig.SERVER_BASE_URL}
+
+  # ---------- desktopMain ----------
+  DesktopMain:
+    archivo: app/src/desktopMain/kotlin/com/dev/yoump3/Main.kt
+    rol: Window + ViewModelStore manual + cierre -> AppBackgroundSignal
+    construye: PlatformDependencies(DesktopAppConfig, DesktopAudioSaver, DesktopAppPreferences)
+  DesktopAudioPlayer: {archivo: .../services/DesktopAudioPlayer.kt, implements: AudioPlayer, mecanica: javax.sound Clip}
+  DesktopAudioSaver:  {archivo: .../services/DesktopAudioSaver.kt, implements: AudioSaver, mecanica: FileSystem}
+  DesktopAppPreferences: {archivo: .../preferences/DesktopAppPreferences.kt, implements: AppPreferences, mecanica: java.util.prefs}
+  DesktopAppConfig: {archivo: .../config/DesktopAppConfig.kt, implements: AppConfig, fuente: DesktopServerUrl generado}
+
+relaciones_expect_actual:
+  - {expect: "val appVersion", android: AppVersion.android.kt, desktop: "AppVersion.desktop.kt (generado)"}
+  - {expect: "fun createAudioPlayer(): AudioPlayer", android: AndroidAudioPlayer.kt, desktop: DesktopAudioPlayer.kt}
+  - {expect: "suspend fun decodeBase64(String): ByteArray", android: Base64Codec.android.kt, desktop: Base64Codec.desktop.kt}
+  - {expect: "@Composable fun DownloadLink(...)", android: DownloadLink.android.kt, desktop: DownloadLink.desktop.kt}
+  - {interface: AppConfig, android: AndroidAppConfig, desktop: DesktopAppConfig}
+  - {interface: AppPreferences, android: AndroidAppPreferences, desktop: DesktopAppPreferences}
+  - {interface: AudioSaver, android: AndroidAudioSaver, desktop: DesktopAudioSaver}
+
+grafo_dependencias: |
+  MainActivity / DesktopMain
+      └─▶ PlatformDependencies ─▶ YouMp3ViewModel
+             ├─▶ SettingsViewModel ─▶ (AppPreferences, AppConfig)
+             ├─▶ YouMp3Api(baseUrl = settings.effectiveServerUrl) ─▶ Ktor ─▶ backend
+             ├─▶ SongInputViewModel ─▶ (YouMp3Api, AudioSaver, AudioPlayer→ExtractedAudio,
+             │                            AppPreferences, decodeBase64, AppBackgroundSignal)
+             └─▶ ErrorStatusViewModel ◀── AppError (AppErrorCatalog/ApiException)
+      YouMp3App(viewModel) ─▶ pantallas interfaces/* según activeWindow/currentScreen
+
+pruebas:
+  directorio: app/src/test/java/com/dev/yoump3
+  framework: JUnit 4
+  seam_di: PlatformDependencies permite fakes (audioPlayer inyectable sin Context de Android)
+  casos:
+    - {archivo: viewModels/YouMp3BackTest.kt, cubre: "back/navegación sobre AppWindow y YouMp3Screen"}
+    - {archivo: viewModels/SettingsViewModelTest.kt, cubre: "temas, servidores, normalización de URL"}
+    - {archivo: viewModels/DataUsageConsentTest.kt, cubre: "máquina de estados del consentimiento"}
+    - {archivo: error/AppErrorCatalogTest.kt, cubre: "clasificación HTTP/transporte → AppErrorKind"}
+
+convenciones:
+  - comentarios y docstrings en español
+  - versión solo en YouMp3Version (gradle.properties); nunca editar código generado
+  - RepositoriesMode.FAIL_ON_PROJECT_REPOS: sin repositories {} en módulos
+  - lógica compartida en commonMain; actuals solo con mecánica de plataforma
+  - gate CI: assembleRelease → lintRelease → :app:compileKotlinDesktop → check
